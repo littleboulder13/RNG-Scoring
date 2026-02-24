@@ -404,13 +404,19 @@ button {
 
 .competitor-item {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
     padding: 0.75rem 1rem;
     border: 1px solid #eee;
     border-radius: 4px;
     margin-bottom: 0.5rem;
     background: white;
+    gap: 0.25rem;
+}
+
+.stage-view {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .competitor-name {
@@ -492,6 +498,71 @@ button {
 
 .btn-delete:hover {
     background: #d32f2f;
+}
+
+.btn-edit {
+    background: #f0f0f0;
+    color: #333;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.875rem;
+    width: auto;
+    border: 1px solid #ccc;
+}
+
+.btn-edit:hover {
+    background: #e0e0e0;
+}
+
+.item-actions {
+    display: flex;
+    gap: 0.4rem;
+    flex-shrink: 0;
+}
+
+.stage-edit {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    width: 100%;
+    padding-top: 0.25rem;
+}
+
+.stage-edit input {
+    flex: 1;
+    min-width: 80px;
+    padding: 0.4rem 0.5rem;
+    font-size: 0.9rem;
+}
+
+.edit-actions {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.btn-save-edit {
+    background: var(--secondary-color);
+    color: white;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.875rem;
+    width: auto;
+}
+
+.btn-save-edit:hover {
+    background: #45a049;
+}
+
+.btn-cancel-edit {
+    background: #f0f0f0;
+    color: #333;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.875rem;
+    width: auto;
+    border: 1px solid #ccc;
+}
+
+.btn-cancel-edit:hover {
+    background: #e0e0e0;
 }
 
 /* Export bar */

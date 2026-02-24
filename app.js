@@ -86,6 +86,21 @@ function removeStage(name) {
     renderStagesList();
 }
 
+function updateStage(oldName, newName, targets, par) {
+    const stages = getStages();
+    const idx = stages.findIndex(s => s.name === oldName);
+    if (idx === -1) return;
+    // If renaming to a name that already exists (and it's not the same stage), abort
+    if (newName !== oldName && stages.find(s => s.name === newName)) {
+        alert(`A stage named "${newName}" already exists.`);
+        return;
+    }
+    stages[idx] = { name: newName, targets, par };
+    saveStages(stages);
+    populateStageDropdown();
+    renderStagesList();
+}
+
 /* =============================================================
    UI — Render Lists & Dropdowns
    ============================================================= */
@@ -101,11 +116,13 @@ function renderCompetitorsList() {
 
     el.innerHTML = players.map(p => `
         <div class="competitor-item">
-            <div class="competitor-info">
-                <span class="competitor-name">${p.name}</span>
-                ${p.division ? `<span class="competitor-division-tag">${p.division}</span>` : ''}
+            <div class="stage-view">
+                <div class="competitor-info">
+                    <span class="competitor-name">${p.name}</span>
+                    ${p.division ? `<span class="competitor-division-tag">${p.division}</span>` : ''}
+                </div>
+                <button class="btn-delete" data-name="${p.name}">Remove</button>
             </div>
-            <button class="btn-delete" data-name="${p.name}">Remove</button>
         </div>
     `).join('');
 
@@ -145,17 +162,62 @@ function renderStagesList() {
             s.par     ? `PAR: ${s.par}s`        : ''
         ].filter(Boolean).join(' · ');
         return `
-        <div class="competitor-item">
-            <span class="competitor-name">
-                ${s.name}${meta ? ` <em style="color:#888;font-size:0.85em">(${meta})</em>` : ''}
-            </span>
-            <button class="btn-delete" data-name="${s.name}">Remove</button>
+        <div class="competitor-item" data-stage-name="${s.name}">
+            <div class="stage-view">
+                <span class="competitor-name">
+                    ${s.name}${meta ? ` <em style="color:#888;font-size:0.85em">(${meta})</em>` : ''}
+                </span>
+                <div class="item-actions">
+                    <button class="btn-edit" data-name="${s.name}">Edit</button>
+                    <button class="btn-delete" data-name="${s.name}">Remove</button>
+                </div>
+            </div>
+            <div class="stage-edit" style="display:none">
+                <input type="text" class="edit-name" value="${s.name}" placeholder="Stage name">
+                <input type="number" class="edit-targets" value="${s.targets}" placeholder="# of targets" min="0" style="width:110px">
+                <input type="number" class="edit-par" value="${s.par}" placeholder="PAR (s)" min="0" step="0.01" style="width:110px">
+                <div class="edit-actions">
+                    <button class="btn-save-edit" data-name="${s.name}">Save</button>
+                    <button class="btn-cancel-edit">Cancel</button>
+                </div>
+            </div>
         </div>`;
     }).join('');
 
     el.querySelectorAll('.btn-delete').forEach(btn =>
         btn.addEventListener('click', () => removeStage(btn.dataset.name))
     );
+
+    el.querySelectorAll('.btn-edit').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const row = btn.closest('.competitor-item');
+            row.querySelector('.stage-view').style.display = 'none';
+            row.querySelector('.stage-edit').style.display = '';
+            row.querySelector('.edit-name').focus();
+        });
+    });
+
+    el.querySelectorAll('.btn-cancel-edit').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const row = btn.closest('.competitor-item');
+            row.querySelector('.stage-view').style.display = '';
+            row.querySelector('.stage-edit').style.display = 'none';
+        });
+    });
+
+    el.querySelectorAll('.btn-save-edit').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const row    = btn.closest('.competitor-item');
+            const newName = row.querySelector('.edit-name').value.trim();
+            if (!newName) return;
+            updateStage(
+                btn.dataset.name,
+                newName,
+                row.querySelector('.edit-targets').value.trim(),
+                row.querySelector('.edit-par').value.trim()
+            );
+        });
+    });
 }
 
 function populateStageDropdown() {
