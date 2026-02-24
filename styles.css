@@ -1,0 +1,460 @@
+:root {
+    --primary-color: #2196F3;
+    --secondary-color: #4CAF50;
+    --error-color: #f44336;
+    --text-color: #333;
+    --bg-color: #f5f5f5;
+    --card-bg: #ffffff;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: var(--bg-color);
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+#app {
+    max-width: 600px;
+    margin: 0 auto;
+    min-height: 100vh;
+}
+
+header {
+    background: var(--primary-color);
+    color: white;
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+header h1 {
+    font-size: 1.5rem;
+}
+
+.status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-indicator {
+    font-size: 1.5rem;
+}
+
+.status-indicator.online {
+    color: #4CAF50;
+}
+
+.status-indicator.offline {
+    color: #ff9800;
+}
+
+main {
+    padding: 1rem;
+}
+
+section {
+    background: var(--card-bg);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+h2 {
+    margin-bottom: 1rem;
+    font-size: 1.25rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+input, textarea, select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-family: inherit;
+    background: white;
+    -webkit-appearance: none;
+}
+
+select {
+    cursor: pointer;
+}
+
+input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.form-row {
+    display: flex;
+    gap: 1rem;
+}
+
+.form-row .form-group {
+    flex: 1;
+}
+
+.add-player {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.add-player input {
+    flex: 1;
+}
+
+/* Minutes : seconds input pair */
+.time-inputs {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.time-part {
+    width: 0;
+    flex: 1;
+}
+
+.time-sep {
+    font-weight: 600;
+    color: #666;
+    flex-shrink: 0;
+}
+
+.btn-add {
+    background: var(--secondary-color);
+    color: white;
+    width: 40px;
+    height: 40px;
+    font-size: 1.25rem;
+    font-weight: bold;
+    border-radius: 4px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-add:hover {
+    background: #45a049;
+}
+
+.checkbox-group {
+    display: flex;
+    align-items: flex-end;
+    padding-bottom: 0.75rem;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-weight: 500;
+    user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: auto;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: var(--error-color);
+}
+
+button {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.btn-primary {
+    background: var(--primary-color);
+    color: white;
+    width: 100%;
+}
+
+.btn-primary:hover {
+    background: #1976D2;
+}
+
+.btn-secondary {
+    background: var(--secondary-color);
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #45a049;
+}
+
+.sync-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background: #fff3e0;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+.score-item {
+    padding: 1rem;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.score-item.synced {
+    background: #f1f8f4;
+}
+
+.score-item.pending {
+    background: #fff8e1;
+}
+
+.score-info h3 {
+    margin-bottom: 0.25rem;
+}
+
+.score-stage-badge {
+    display: inline-block;
+    background: #e3f2fd;
+    color: var(--primary-color);
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+    margin-bottom: 0.25rem;
+}
+
+.score-meta {
+    font-size: 0.875rem;
+    color: #666;
+}
+
+.score-details {
+    text-align: right;
+}
+
+.score-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.score-value.dnf {
+    color: var(--error-color);
+}
+
+.score-stats {
+    font-size: 0.8rem;
+    color: #666;
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: #999;
+}
+
+/* Tab navigation */
+.tab-bar {
+    display: flex;
+    background: var(--card-bg);
+    border-radius: 8px;
+    padding: 0.25rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    gap: 0.25rem;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 0.6rem 0.5rem;
+    background: transparent;
+    color: var(--text-color);
+    font-weight: 500;
+    border-radius: 6px;
+    transition: background 0.2s, color 0.2s;
+}
+
+.tab-btn:hover {
+    background: #e3f2fd;
+}
+
+.tab-btn.active {
+    background: var(--primary-color);
+    color: white;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Competitors management */
+.competitors-mgmt {
+    background: var(--card-bg);
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.add-competitor-form {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+}
+
+.add-competitor-form input {
+    flex: 1;
+}
+
+.add-competitor-form .btn-primary {
+    width: auto;
+    white-space: nowrap;
+}
+
+.competitor-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    background: white;
+}
+
+.competitor-name {
+    font-weight: 500;
+}
+
+.competitor-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.competitor-division-tag {
+    background: #e8f5e9;
+    color: #2e7d32;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+}
+
+.score-division-tag {
+    background: #e8f5e9;
+    color: #2e7d32;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.1rem 0.45rem;
+    border-radius: 10px;
+    margin-left: 0.3rem;
+    vertical-align: middle;
+}
+
+.division-display {
+    margin-top: 0.4rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #2e7d32;
+    display: none;
+}
+
+/* Import bar */
+.import-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.btn-import {
+    display: inline-block;
+    background: #7b1fa2;
+    color: white;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.3s;
+    white-space: nowrap;
+}
+
+.btn-import:hover {
+    background: #6a1b9a;
+}
+
+.import-hint {
+    font-size: 0.8rem;
+    color: #888;
+}
+
+.btn-delete {
+    background: var(--error-color);
+    color: white;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.875rem;
+    width: auto;
+}
+
+.btn-delete:hover {
+    background: #d32f2f;
+}
+
+/* Export bar */
+.export-bar {
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.btn-export {
+    background: #5c6bc0;
+    color: white;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    width: auto;
+}
+
+.btn-export:hover {
+    background: #3949ab;
+}
