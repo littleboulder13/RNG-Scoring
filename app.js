@@ -1,56 +1,105 @@
-// Database setup
-const DB_NAME = 'RNGScoringDB';
+/* ============================================================
+   RNG Scoring App — Main Application Logic
+   ============================================================ */
+
+// --- Configuration & State -----------------------------------
+const DB_NAME    = 'RNGScoringDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'scores';
 let db;
 
-// Player management (stored in localStorage)
+let resolveDbReady;
+const dbReady = new Promise(r => { resolveDbReady = r; });
+
+// DOM shorthand
+const $ = (id) => document.getElementById(id);
+
+/* =============================================================
+   LOCAL STORAGE — Players
+   ============================================================= */
 function getPlayers() {
     const raw = localStorage.getItem('rng_players');
     if (!raw) return [];
-    const players = JSON.parse(raw);
-    // Migrate old plain-string format to {name, division} objects
-    const migrated = players.map(p => (typeof p === 'string' ? { name: p, division: '' } : p));
-    // If migration was needed, save the updated format back
-    if (players.some(p => typeof p === 'string')) {
+    const arr = JSON.parse(raw);
+    // Migrate old plain-string format → { name, division }
+    if (arr.length && typeof arr[0] === 'string') {
+        const migrated = arr.map(n => ({ name: n, division: '' }));
         localStorage.setItem('rng_players', JSON.stringify(migrated));
+        return migrated;
     }
-    return migrated;
+    return arr;
 }
 
-function savePlayers(players) {
-    localStorage.setItem('rng_players', JSON.stringify(players));
+function savePlayers(list) {
+    localStorage.setItem('rng_players', JSON.stringify(list));
 }
 
 function addPlayer(name, division = '') {
     const players = getPlayers();
-    if (!players.find(p => p.name === name)) {
-        players.push({ name, division });
-        players.sort((a, b) => a.name.localeCompare(b.name));
-        savePlayers(players);
-    }
-    populatePlayerDropdown();
-    renderCompetitorsList();
-}
-
-function removePlayer(name) {
-    const players = getPlayers().filter(p => p.name !== name);
+    if (players.find(p => p.name === name)) return;
+    players.push({ name, division });
+    players.sort((a, b) => a.name.localeCompare(b.name));
     savePlayers(players);
     populatePlayerDropdown();
     renderCompetitorsList();
 }
 
-function renderCompetitorsList() {
-    const container = document.getElementById('competitors-list');
-    if (!container) return;
+function removePlayer(name) {
+    savePlayers(getPlayers().filter(p => p.name !== name));
+    populatePlayerDropdown();
+    renderCompetitorsList();
+}
 
+function getPlayerDivision(name) {
+    const p = getPlayers().find(p => p.name === name);
+    return p ? p.division || '' : '';
+}
+
+/* =============================================================
+   LOCAL STORAGE — Stages
+   ============================================================= */
+function getStages() {
+    const raw = localStorage.getItem('rng_stages');
+    if (!raw) return [];
+    // Migrate old plain-string format → { name, targets }
+    return JSON.parse(raw).map(s =>
+        typeof s === 'string' ? { name: s, targets: '' } : s
+    );
+}
+
+function saveStages(list) {
+    localStorage.setItem('rng_stages', JSON.stringify(list));
+}
+
+function addStage(name, targets = '', par = '') {
+    const stages = getStages();
+    if (stages.find(s => s.name === name)) return;
+    stages.push({ name, targets, par });
+    saveStages(stages);
+    populateStageDropdown();
+    renderStagesList();
+}
+
+function removeStage(name) {
+    saveStages(getStages().filter(s => s.name !== name));
+    populateStageDropdown();
+    renderStagesList();
+}
+
+/* =============================================================
+   UI — Render Lists & Dropdowns
+   ============================================================= */
+function renderCompetitorsList() {
+    const el = $('competitors-list');
+    if (!el) return;
     const players = getPlayers();
-    if (players.length === 0) {
-        container.innerHTML = '<div class="empty-state">No competitors yet. Add names above to get started.</div>';
+
+    if (!players.length) {
+        el.innerHTML = '<div class="empty-state">No competitors yet. Add names above to get started.</div>';
         return;
     }
 
-    container.innerHTML = players.map(p => `
+    el.innerHTML = players.map(p => `
         <div class="competitor-item">
             <div class="competitor-info">
                 <span class="competitor-name">${p.name}</span>
@@ -60,152 +109,175 @@ function renderCompetitorsList() {
         </div>
     `).join('');
 
-    container.querySelectorAll('.btn-delete').forEach(btn => {
-        btn.addEventListener('click', () => removePlayer(btn.dataset.name));
-    });
+    el.querySelectorAll('.btn-delete').forEach(btn =>
+        btn.addEventListener('click', () => removePlayer(btn.dataset.name))
+    );
 }
 
 function populatePlayerDropdown() {
-    const select = document.getElementById('player-name');
-    const currentValue = select.value;
-    
-    // Clear existing options (keep the placeholder)
-    select.innerHTML = '<option value="" disabled selected>Select shooter...</option>';
-    
+    const sel = $('player-name');
+    if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = '<option value="" disabled selected>Select shooter...</option>';
     const players = getPlayers();
-    players.forEach(player => {
-        const option = document.createElement('option');
-        option.value = player.name;
-        option.textContent = player.name;
-        select.appendChild(option);
+    players.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.name;
+        opt.textContent = p.name;
+        sel.appendChild(opt);
     });
-    
-    // Restore selection if it still exists
-    if (currentValue && players.find(p => p.name === currentValue)) {
-        select.value = currentValue;
-    }
-}
-
-// Stage management (stored in localStorage)
-function getStages() {
-    const raw = localStorage.getItem('rng_stages');
-    if (!raw) return [];
-    const stages = JSON.parse(raw);
-    // Migrate old plain-string format to {name, targets} objects
-    return stages.map(s => (typeof s === 'string' ? { name: s, targets: '' } : s));
-}
-
-function saveStages(stages) {
-    localStorage.setItem('rng_stages', JSON.stringify(stages));
-}
-
-function addStage(name, targets = '') {
-    const stages = getStages();
-    if (!stages.find(s => s.name === name)) {
-        stages.push({ name, targets });
-        saveStages(stages);
-    }
-    populateStageDropdown();
-    renderStagesList();
-}
-
-function removeStage(name) {
-    const stages = getStages().filter(s => s.name !== name);
-    saveStages(stages);
-    populateStageDropdown();
-    renderStagesList();
+    if (prev && players.find(p => p.name === prev)) sel.value = prev;
 }
 
 function renderStagesList() {
-    const container = document.getElementById('stages-list');
-    if (!container) return;
-
+    const el = $('stages-list');
+    if (!el) return;
     const stages = getStages();
-    if (stages.length === 0) {
-        container.innerHTML = '<div class="empty-state">No stages yet. Add stages above to get started.</div>';
+
+    if (!stages.length) {
+        el.innerHTML = '<div class="empty-state">No stages yet. Add stages above to get started.</div>';
         return;
     }
 
-    container.innerHTML = stages.map(stage => `
+    el.innerHTML = stages.map(s => {
+        const meta = [
+            s.targets ? `${s.targets} targets` : '',
+            s.par     ? `PAR: ${s.par}s`        : ''
+        ].filter(Boolean).join(' · ');
+        return `
         <div class="competitor-item">
-            <span class="competitor-name">${stage.name}${stage.targets ? ` <em style="color:#888;font-size:0.85em">(${stage.targets} targets)</em>` : ''}</span>
-            <button class="btn-delete" data-name="${stage.name}">Remove</button>
-        </div>
-    `).join('');
+            <span class="competitor-name">
+                ${s.name}${meta ? ` <em style="color:#888;font-size:0.85em">(${meta})</em>` : ''}
+            </span>
+            <button class="btn-delete" data-name="${s.name}">Remove</button>
+        </div>`;
+    }).join('');
 
-    container.querySelectorAll('.btn-delete').forEach(btn => {
-        btn.addEventListener('click', () => removeStage(btn.dataset.name));
-    });
+    el.querySelectorAll('.btn-delete').forEach(btn =>
+        btn.addEventListener('click', () => removeStage(btn.dataset.name))
+    );
 }
 
 function populateStageDropdown() {
-    const select = document.getElementById('stage');
-    if (!select) return;
-    const currentValue = select.value;
-    select.innerHTML = '<option value="" disabled selected>Select stage...</option>';
+    const sel = $('stage');
+    if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = '<option value="" disabled selected>Select stage...</option>';
     const stages = getStages();
-    stages.forEach(stage => {
-        const option = document.createElement('option');
-        option.value = stage.name;
-        option.textContent = stage.name;
-        select.appendChild(option);
+    stages.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.name;
+        opt.textContent = s.name;
+        sel.appendChild(opt);
     });
-    if (currentValue && stages.find(s => s.name === currentValue)) {
-        select.value = currentValue;
-    }
+    if (prev && stages.find(s => s.name === prev)) sel.value = prev;
 }
 
 function showStageInfo() {
-    const stageName = document.getElementById('stage')?.value;
-    const display = document.getElementById('stage-info-display');
+    const display = $('stage-info-display');
     if (!display) return;
-    const stage = getStages().find(s => s.name === stageName);
-    display.textContent = stage && stage.targets ? `Targets: ${stage.targets}` : '';
+    const stage = getStages().find(s => s.name === $('stage')?.value);
+    const parts = [
+        stage?.targets ? `Targets: ${stage.targets}` : '',
+        stage?.par     ? `PAR: ${stage.par}s`         : ''
+    ].filter(Boolean);
+    display.textContent = parts.join('  ·  ');
+    display.style.display = parts.length ? 'block' : 'none';
 }
 
-// Look up a competitor's division by name
-function getPlayerDivision(name) {
-    const player = getPlayers().find(p => p.name === name);
-    return player ? (player.division || '') : '';
-}
-
-// Show the selected shooter's division below the dropdown
 function showShooterDivision() {
-    const name = document.getElementById('player-name').value;
-    const el = document.getElementById('shooter-division-display');
+    const el = $('shooter-division-display');
     if (!el) return;
-    const division = getPlayerDivision(name);
-    if (division) {
-        el.textContent = `Division: ${division}`;
-        el.style.display = 'block';
-    } else {
-        el.textContent = '';
-        el.style.display = 'none';
-    }
+    const div = getPlayerDivision($('player-name').value);
+    el.textContent = div ? `Division: ${div}` : '';
+    el.style.display = div ? 'block' : 'none';
 }
 
-// Import competitors from the first sheet of an Excel file
-// Expected: Column A = Name, Column B = Division (optional header row is skipped)
-async function importFromExcel(file) {
-    const data = await file.arrayBuffer();
-    const wb = XLSX.read(data);
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+function toggleDNFFields() {
+    const dnf = $('dnf').checked;
+    if ($('time-row'))  $('time-row').style.display  = dnf ? 'none' : '';
+    if ($('tnt-row'))   $('tnt-row').style.display   = dnf ? ''     : 'none';
+    if ($('time'))      $('time').required = !dnf;
+    if ($('dnf-group')) $('dnf-group').classList.toggle('dnf-active', dnf);
+}
 
-    const players = getPlayers();
-    let imported = 0;
-    rows.forEach(row => {
-        const name = (row[0] || '').toString().trim();
-        const division = (row[1] || '').toString().trim();
-        // Skip blank rows and header rows
-        if (!name || ['name', 'shooter', 'competitor'].includes(name.toLowerCase())) return;
-        // Skip duplicates
-        if (players.find(p => p.name === name)) return;
-        players.push({ name, division });
-        imported++;
+/* =============================================================
+   UI — Scores Display & Online Status
+   ============================================================= */
+async function updateUI() {
+    const scores  = await getAllScores();
+    const pending = scores.filter(s => !s.synced);
+
+    $('pending-count').textContent = pending.length;
+
+    const el = $('scores-container');
+    if (!scores.length) {
+        el.innerHTML = '<div class="empty-state">No scores yet. Add your first score above!</div>';
+        return;
+    }
+
+    scores.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    // Build a set of shooter+stage combos that appear more than once
+    const comboCounts = {};
+    scores.forEach(s => {
+        const key = `${s.playerName}||${s.stage}`;
+        comboCounts[key] = (comboCounts[key] || 0) + 1;
     });
 
-    if (imported === 0) {
+    el.innerHTML = scores.map(s => {
+        const isDup = comboCounts[`${s.playerName}||${s.stage}`] > 1;
+        return `
+        <div class="score-item ${s.synced ? 'synced' : 'pending'}${isDup ? ' duplicate' : ''}">
+            <div class="score-info">
+                <h3>${s.playerName}${s.division ? ` <span class="score-division-tag">${s.division}</span>` : ''}${isDup ? ' <span class="duplicate-badge">⚠ Duplicate</span>' : ''}</h3>
+                ${s.stage ? `<div class="score-stage-badge">${s.stage}</div>` : ''}
+                <div class="score-meta">
+                    ${new Date(s.timestamp).toLocaleString()}
+                    ${s.notes ? `<br>📝 ${s.notes}` : ''}
+                    <br><em>${s.synced ? '✓ Synced' : '⏳ Pending sync'}</em>
+                </div>
+            </div>
+            <div class="score-details">
+                <div class="score-value ${s.dnf ? 'dnf' : ''}">${s.dnf ? 'DNF' : s.time + 's'}</div>
+                <div class="score-stats">
+                    <span>Wait: ${formatWaitTime(s.waitTime)}</span>
+                    <span>TNT: ${s.targetsNotNeutralized}</span>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function updateOnlineStatus() {
+    const online = navigator.onLine;
+    $('online-status').classList.toggle('online', online);
+    $('online-status').classList.toggle('offline', !online);
+    $('status-text').textContent = online ? 'Online' : 'Offline';
+}
+
+/* =============================================================
+   EXCEL — Import
+   ============================================================= */
+async function importFromExcel(file) {
+    const data = await file.arrayBuffer();
+    const wb   = XLSX.read(data);
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+
+    const players     = getPlayers();
+    const headerNames = new Set(['name', 'shooter', 'competitor']);
+    let imported = 0;
+
+    for (const row of rows) {
+        const name     = String(row[0] || '').trim();
+        const division = String(row[1] || '').trim();
+        if (!name || headerNames.has(name.toLowerCase())) continue;
+        if (players.find(p => p.name === name)) continue;
+        players.push({ name, division });
+        imported++;
+    }
+
+    if (!imported) {
         alert('No new competitors found to import.\n\nMake sure:\n• Column A = Name\n• Column B = Division\n• First sheet is the competitor list');
         return;
     }
@@ -217,269 +289,168 @@ async function importFromExcel(file) {
     alert(`Successfully imported ${imported} competitor(s).`);
 }
 
-// Initialize IndexedDB
-function initDB() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-        
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-            db = request.result;
-            resolve(db);
-        };
-        
-        request.onupgradeneeded = (event) => {
-            const db = event.target.result;
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-                const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
-                store.createIndex('timestamp', 'timestamp', { unique: false });
-                store.createIndex('synced', 'synced', { unique: false });
-            }
-        };
-    });
-}
-
-// Save score to IndexedDB
-async function saveScore(score) {
-    const transaction = db.transaction([STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    
-    score.timestamp = new Date().toISOString();
-    score.synced = 0;
-    
-    return new Promise((resolve, reject) => {
-        const request = store.add(score);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
-}
-
-// Get all scores from IndexedDB
-async function getAllScores() {
-    const transaction = db.transaction([STORE_NAME], 'readonly');
-    const store = transaction.objectStore(STORE_NAME);
-    
-    return new Promise((resolve, reject) => {
-        const request = store.getAll();
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
-}
-
-// Get pending (unsynced) scores
-async function getPendingScores() {
-    const scores = await getAllScores();
-    return scores.filter(s => !s.synced);
-}
-
-// Mark score as synced
-async function markAsSynced(id) {
-    const transaction = db.transaction([STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    
-    return new Promise((resolve, reject) => {
-        const getRequest = store.get(id);
-        getRequest.onsuccess = () => {
-            const score = getRequest.result;
-            score.synced = 1;
-            const updateRequest = store.put(score);
-            updateRequest.onsuccess = () => resolve();
-            updateRequest.onerror = () => reject(updateRequest.error);
-        };
-        getRequest.onerror = () => reject(getRequest.error);
-    });
-}
-
-// Sync scores to server
-async function syncScores() {
-    if (!navigator.onLine) {
-        alert('Cannot sync while offline');
-        return;
-    }
-    
-    const pendingScores = await getPendingScores();
-    
-    if (pendingScores.length === 0) {
-        alert('No scores to sync');
-        return;
-    }
-    
-    try {
-        // TODO: Replace with your actual API endpoint
-        const response = await fetch('https://your-api-endpoint.com/api/scores', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(pendingScores)
-        });
-        
-        if (response.ok) {
-            // Mark all as synced
-            for (const score of pendingScores) {
-                await markAsSynced(score.id);
-            }
-            alert(`Successfully synced ${pendingScores.length} scores`);
-            updateUI();
-        } else {
-            throw new Error('Sync failed');
-        }
-    } catch (error) {
-        console.error('Sync error:', error);
-        alert('Sync failed. Scores are saved locally and will sync when possible.');
-    }
-}
-
-// Format total seconds as m:ss
+/* =============================================================
+   EXCEL — Export
+   ============================================================= */
 function formatWaitTime(totalSeconds) {
     const m = Math.floor(totalSeconds / 60);
     const s = totalSeconds % 60;
     return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-// Export all scores to Excel with one sheet per stage
 async function exportToExcel() {
     const allScores = await getAllScores();
-    const players = getPlayers();
-    const stages = getStages();
+    const players   = getPlayers();
+    const stages    = getStages();
 
-    if (stages.length === 0) {
-        alert('No stages found. Add stages first.');
-        return;
-    }
-    if (players.length === 0) {
-        alert('No competitors found. Add competitors first.');
-        return;
-    }
+    if (!stages.length)  return alert('No stages found. Add stages first.');
+    if (!players.length) return alert('No competitors found. Add competitors first.');
 
-    // Sort scores oldest first so the first recorded run is used when a shooter has multiple entries
     allScores.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-    const wb = XLSX.utils.book_new();
+    const wb      = XLSX.utils.book_new();
     const headers = ['#', 'Shooter', 'Division', 'Time (s)', 'Wait Time (m:ss)', 'Targets Not Neutralized', 'Notes'];
 
-    stages.forEach(stage => {
-        // All scores for this stage, in input order
-        const stageScores = allScores.filter(s => s.stage === stage.name);
+    // Helper: build one row for a competitor
+    const buildRow = (i, name, division, score) => score
+        ? [i + 1, name, division, score.dnf ? 'DNF' : score.time,
+           formatWaitTime(score.waitTime), score.targetsNotNeutralized, score.notes || '']
+        : [i + 1, name, division, '', '', '', ''];
 
-        // Build a lookup: playerName -> score (first recorded run)
+    // One sheet per stage — every competitor listed
+    for (const stage of stages) {
         const scoreMap = {};
-        stageScores.forEach(s => {
+        allScores.filter(s => s.stage === stage.name).forEach(s => {
             if (!scoreMap[s.playerName]) scoreMap[s.playerName] = s;
         });
+        const rows = players.map((p, i) => buildRow(i, p.name, p.division || '', scoreMap[p.name]));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers, ...rows]), stage.name.substring(0, 31));
+    }
 
-        // One row per competitor in competitor-list order; fill score if it exists
-        const rows = players.map((p, i) => {
-            const s = scoreMap[p.name];
-            if (s) {
-                return [
-                    i + 1,
-                    p.name,
-                    p.division || '',
-                    s.dnf ? 'DNF' : s.time,
-                    formatWaitTime(s.waitTime),
-                    s.targetsNotNeutralized,
-                    s.notes || ''
-                ];
-            } else {
-                return [i + 1, p.name, p.division || '', '', '', '', '', '', ''];
-            }
-        });
+    // Orphan scores (recorded against stages no longer in the list)
+    const knownNames = new Set(stages.map(s => s.name));
+    const orphans    = allScores.filter(s => s.stage && !knownNames.has(s.stage));
+    for (const stageName of [...new Set(orphans.map(s => s.stage))]) {
+        const rows = orphans.filter(s => s.stage === stageName)
+            .map((s, i) => buildRow(i, s.playerName || '', s.division || '', s));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers, ...rows]), stageName.substring(0, 31));
+    }
 
-        const wsData = [headers, ...rows];
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
-        XLSX.utils.book_append_sheet(wb, ws, stage.name.substring(0, 31));
+    // Duplicates sheet — all scores where a shooter+stage combo appears more than once
+    const comboCounts = {};
+    allScores.forEach(s => {
+        const key = `${s.playerName}||${s.stage}`;
+        comboCounts[key] = (comboCounts[key] || 0) + 1;
     });
 
-    // Also add a sheet for any scores recorded against stages not in the stage list
-    const knownStageNames = new Set(stages.map(s => s.name));
-    const orphanScores = allScores.filter(s => s.stage && !knownStageNames.has(s.stage));
-    if (orphanScores.length > 0) {
-        const orphanStages = [...new Set(orphanScores.map(s => s.stage))];
-        orphanStages.forEach(stageName => {
-            const stageScores = orphanScores.filter(s => s.stage === stageName);
-            const wsData = [
-                headers,
-                ...stageScores.map((s, i) => [
-                    i + 1,
-                    s.playerName || '',
-                    s.division || '',
-                    s.dnf ? 'DNF' : s.time,
-                    formatWaitTime(s.waitTime),
-                    s.targetsNotNeutralized,
-                    s.notes || ''
-                ])
+    const dupeScores = allScores.filter(s => comboCounts[`${s.playerName}||${s.stage}`] > 1);
+
+    if (dupeScores.length) {
+        // Track run instance per shooter+stage
+        const instanceCounter = {};
+        const dupeHeaders = ['#', 'Shooter', 'Division', 'Stage', 'Run #', 'Time (s)', 'Wait Time (m:ss)', 'Targets Not Neutralized', 'Notes'];
+        const dupeRows = dupeScores.map((s, i) => {
+            const key = `${s.playerName}||${s.stage}`;
+            instanceCounter[key] = (instanceCounter[key] || 0) + 1;
+            return [
+                i + 1,
+                s.playerName || '',
+                s.division || '',
+                s.stage || '',
+                instanceCounter[key],
+                s.dnf ? 'DNF' : s.time,
+                formatWaitTime(s.waitTime),
+                s.targetsNotNeutralized,
+                s.notes || ''
             ];
-            const ws = XLSX.utils.aoa_to_sheet(wsData);
-            XLSX.utils.book_append_sheet(wb, ws, stageName.substring(0, 31));
         });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([dupeHeaders, ...dupeRows]), 'Duplicates');
     }
 
     XLSX.writeFile(wb, `rng-scores-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
-// Update UI with scores
-async function updateUI() {
-    const scores = await getAllScores();
+/* =============================================================
+   INDEXEDDB — Database Operations
+   ============================================================= */
+function initDB() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onerror   = () => reject(req.error);
+        req.onsuccess = () => { db = req.result; resolve(db); };
+        req.onupgradeneeded = (e) => {
+            const store = e.target.result.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+            store.createIndex('timestamp', 'timestamp');
+            store.createIndex('synced', 'synced');
+        };
+    });
+}
+
+function saveScore(score) {
+    return new Promise((resolve, reject) => {
+        score.timestamp = new Date().toISOString();
+        score.synced = 0;  // Use 0/1, NOT boolean — IDB rejects booleans as index keys
+        const req = db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).add(score);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror   = () => reject(req.error);
+    });
+}
+
+function getAllScores() {
+    return new Promise((resolve, reject) => {
+        const req = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).getAll();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror   = () => reject(req.error);
+    });
+}
+
+async function getPendingScores() {
+    return (await getAllScores()).filter(s => !s.synced);
+}
+
+function markAsSynced(id) {
+    return new Promise((resolve, reject) => {
+        const store = db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME);
+        const req = store.get(id);
+        req.onsuccess = () => {
+            const score = req.result;
+            score.synced = 1;  // Use 0/1, NOT boolean
+            const put = store.put(score);
+            put.onsuccess = () => resolve();
+            put.onerror   = () => reject(put.error);
+        };
+        req.onerror = () => reject(req.error);
+    });
+}
+
+/* =============================================================
+   NETWORK SYNC
+   ============================================================= */
+async function syncScores() {
+    if (!navigator.onLine) return alert('Cannot sync while offline');
     const pending = await getPendingScores();
-    
-    // Update pending count
-    document.getElementById('pending-count').textContent = pending.length;
-    
-    // Display scores
-    const container = document.getElementById('scores-container');
-    
-    if (scores.length === 0) {
-        container.innerHTML = '<div class="empty-state">No scores yet. Add your first score above!</div>';
-        return;
-    }
-    
-    // Sort by timestamp (newest first)
-    scores.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    
-    container.innerHTML = scores.map(score => `
-        <div class="score-item ${score.synced ? 'synced' : 'pending'}">
-            <div class="score-info">
-                <h3>${score.playerName}${score.division ? ` <span class="score-division-tag">${score.division}</span>` : ''}</h3>
-                ${score.stage ? `<div class="score-stage-badge">${score.stage}</div>` : ''}
-                <div class="score-meta">
-                    ${new Date(score.timestamp).toLocaleString()}
-                    ${score.notes ? `<br>📝 ${score.notes}` : ''}
-                    <br><em>${score.synced ? '✓ Synced' : '⏳ Pending sync'}</em>
-                </div>
-            </div>
-            <div class="score-details">
-                <div class="score-value ${score.dnf ? 'dnf' : ''}">${score.dnf ? 'DNF' : score.time + 's'}</div>
-                <div class="score-stats">
-                    <span>Wait: ${formatWaitTime(score.waitTime)}</span>
-                    <span>TNT: ${score.targetsNotNeutralized}</span>
-                </div>
-            </div>
-        </div>
-    `).join('');
-}
+    if (!pending.length) return alert('No scores to sync');
 
-// Handle online/offline status
-function updateOnlineStatus() {
-    const indicator = document.getElementById('online-status');
-    const text = document.getElementById('status-text');
-    
-    if (navigator.onLine) {
-        indicator.classList.remove('offline');
-        indicator.classList.add('online');
-        text.textContent = 'Online';
-    } else {
-        indicator.classList.remove('online');
-        indicator.classList.add('offline');
-        text.textContent = 'Offline';
+    try {
+        // TODO: Replace with your actual API endpoint
+        const res = await fetch('https://your-api-endpoint.com/api/scores', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(pending)
+        });
+        if (!res.ok) throw new Error('Sync failed');
+        for (const s of pending) await markAsSynced(s.id);
+        alert(`Successfully synced ${pending.length} scores`);
+        updateUI();
+    } catch (err) {
+        console.error('Sync error:', err);
+        alert('Sync failed. Scores are saved locally and will sync when possible.');
     }
 }
 
-// Resolves when the DB is ready — used by the form submit handler
-let resolveDbReady;
-const dbReady = new Promise(resolve => { resolveDbReady = resolve; });
-
-// Initialize app
+/* =============================================================
+   INITIALIZATION & EVENT BINDING
+   ============================================================= */
 async function init() {
     try {
         await initDB();
@@ -490,131 +461,131 @@ async function init() {
         alert('Error initialising database: ' + err.message);
     }
     updateOnlineStatus();
-
-    // Sync button
-    document.getElementById('sync-btn').addEventListener('click', syncScores);
-
-    // Export Excel button
-    document.getElementById('export-excel-btn').addEventListener('click', exportToExcel);
-
-    // Online/offline listeners
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
-
-    // Auto-sync when coming online
     window.addEventListener('online', async () => {
-        const pending = await getPendingScores();
-        if (pending.length > 0) {
-            setTimeout(syncScores, 1000);
-        }
+        if ((await getPendingScores()).length) setTimeout(syncScores, 1000);
     });
 }
 
-// Register service worker for offline capability
+// Service Worker Registration
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('service-worker.js')
-            .then(reg => console.log('Service Worker registered'))
-            .catch(err => console.error('Service Worker registration failed:', err));
+            .then(() => console.log('Service Worker registered'))
+            .catch(err => console.error('SW registration failed:', err));
     });
 }
 
-// UI event listeners — registered immediately on page load, independent of DB
+// All UI event listeners — registered on page load, independent of DB
 document.addEventListener('DOMContentLoaded', () => {
 
-    // Tab switching
+    // --- Tab switching ---
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             btn.classList.add('active');
-            document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+            $('tab-' + btn.dataset.tab).classList.add('active');
         });
     });
 
-    // Add competitor button
-    document.getElementById('add-competitor-btn').addEventListener('click', () => {
-        const nameInput = document.getElementById('competitor-name-input');
-        const divInput = document.getElementById('competitor-division-input');
-        const name = nameInput.value.trim();
-        const division = divInput.value.trim();
-        if (name) {
-            addPlayer(name, division);
-            nameInput.value = '';
-            divInput.value = '';
-        }
+    // --- Competitors tab ---
+    $('add-competitor-btn').addEventListener('click', () => {
+        const name = $('competitor-name-input').value.trim();
+        const div  = $('competitor-division-input').value.trim();
+        if (!name) return;
+        addPlayer(name, div);
+        $('competitor-name-input').value = '';
+        $('competitor-division-input').value = '';
+    });
+    $('competitor-name-input').addEventListener('keypress', e => {
+        if (e.key === 'Enter') { e.preventDefault(); $('add-competitor-btn').click(); }
+    });
+    $('import-excel-input').addEventListener('change', e => {
+        if (e.target.files[0]) { importFromExcel(e.target.files[0]); e.target.value = ''; }
     });
 
-    document.getElementById('competitor-name-input').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); document.getElementById('add-competitor-btn').click(); }
+    // --- Stages tab ---
+    $('add-stage-mgmt-btn').addEventListener('click', () => {
+        const name = $('stage-name-input').value.trim();
+        if (!name) return;
+        addStage(name, $('stage-targets-input').value.trim(), $('stage-par-input').value.trim());
+        $('stage-name-input').value = '';
+        $('stage-targets-input').value = '';
+        $('stage-par-input').value = '';
+    });
+    $('stage-name-input').addEventListener('keypress', e => {
+        if (e.key === 'Enter') { e.preventDefault(); $('add-stage-mgmt-btn').click(); }
     });
 
-    // Add stage button
-    document.getElementById('add-stage-mgmt-btn').addEventListener('click', () => {
-        const nameInput = document.getElementById('stage-name-input');
-        const targetsInput = document.getElementById('stage-targets-input');
-        const name = nameInput.value.trim();
-        if (name) {
-            addStage(name, targetsInput.value.trim());
-            nameInput.value = '';
-            targetsInput.value = '';
-        }
-    });
+    // --- Score Entry tab ---
+    $('stage').addEventListener('change', showStageInfo);
+    $('player-name').addEventListener('change', showShooterDivision);
+    $('dnf').addEventListener('change', toggleDNFFields);
+    toggleDNFFields();  // Set initial visibility
 
-    document.getElementById('stage-name-input').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); document.getElementById('add-stage-mgmt-btn').click(); }
-    });
+    // --- Scores tab ---
+    $('sync-btn').addEventListener('click', syncScores);
+    $('export-excel-btn').addEventListener('click', exportToExcel);
 
-    // Show stage target count when stage changes
-    document.getElementById('stage').addEventListener('change', showStageInfo);
-
-    // Show division when shooter changes
-    document.getElementById('player-name').addEventListener('change', showShooterDivision);
-
-    // Import from Excel
-    document.getElementById('import-excel-input').addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            importFromExcel(file);
-            e.target.value = '';
-        }
-    });
-
-    // Populate all dropdowns and lists from localStorage
+    // --- Populate lists from localStorage ---
     populatePlayerDropdown();
     renderCompetitorsList();
     populateStageDropdown();
     renderStagesList();
-    showShooterDivision();
 
-    // Form submission — waits for DB to be ready before saving
-    document.getElementById('score-form').addEventListener('submit', async (e) => {
+    // --- Score form submission ---
+    $('score-form').addEventListener('submit', async e => {
         e.preventDefault();
+        const tnt       = parseInt($('targets-not-neutralized').value) || 0;
+        const stageName = $('stage').value;
+        const stage     = getStages().find(s => s.name === stageName);
+        const stageTargets = stage?.targets !== '' ? parseInt(stage?.targets) : NaN;
+
+        if ($('dnf').checked && !isNaN(stageTargets) && tnt > stageTargets) {
+            const err = $('form-error');
+            err.textContent = "Targets not neutralized input is too high. Review the value input.";
+            err.style.display = 'block';
+            return;
+        }
+        $('form-error').style.display = 'none';
+
+        const playerName = $('player-name').value;
+
+        // Check for existing score for this shooter + stage
+        await dbReady;
+        const existing = await getAllScores();
+        const isDuplicate = existing.some(s => s.playerName === playerName && s.stage === stageName);
+        if (isDuplicate) {
+            const confirmed = confirm(
+                `A score for "${playerName}" on "${stageName}" has already been recorded.\n\nAre you sure you want to add another entry?`
+            );
+            if (!confirmed) return;
+        }
 
         const score = {
-            stage: document.getElementById('stage').value,
-            playerName: document.getElementById('player-name').value,
-            division: getPlayerDivision(document.getElementById('player-name').value),
-            time: parseFloat(document.getElementById('time').value),
-            waitTime: (parseInt(document.getElementById('wait-time-min').value) || 0) * 60
-                    + (parseInt(document.getElementById('wait-time-sec').value) || 0),
-            targetsNotNeutralized: parseInt(document.getElementById('targets-not-neutralized').value) || 0,
-            dnf: document.getElementById('dnf').checked,
-            notes: document.getElementById('notes').value
+            stage:                 stageName,
+            playerName,
+            division:              getPlayerDivision($('player-name').value),
+            time:                  parseFloat($('time').value),
+            waitTime:              (parseInt($('wait-time-min').value) || 0) * 60
+                                 + (parseInt($('wait-time-sec').value) || 0),
+            targetsNotNeutralized: tnt,
+            dnf:                   $('dnf').checked,
+            notes:                 $('notes').value
         };
 
         try {
             await dbReady;
             await saveScore(score);
-
-            // Keep the selected stage and player, reset everything else
-            const selectedStage = document.getElementById('stage').value;
-            const selectedPlayer = document.getElementById('player-name').value;
+            const savedStage  = $('stage').value;
+            const savedPlayer = $('player-name').value;
             e.target.reset();
-            document.getElementById('stage').value = selectedStage;
-            document.getElementById('player-name').value = selectedPlayer;
+            $('stage').value       = savedStage;
+            $('player-name').value = savedPlayer;
             showShooterDivision();
-
+            toggleDNFFields();
             await updateUI();
             alert('Score saved!');
         } catch (err) {
