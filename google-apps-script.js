@@ -4,7 +4,7 @@
  *
  * Handles:
  *   POST action: 'syncScores'  — appends scores to event sheet
- *   POST action: 'pushEvent'   — saves event config to _Events sheet
+ *   POST action: 'pushEvent'   — saves event config to Events sheet
  *   GET  action: 'pullEvents'  — returns all events as JSON
  *
  * SETUP: Deploy → Web app → Execute as Me → Anyone → Deploy
@@ -99,10 +99,11 @@ function _pushEvent(ss, ev) {
     return _jsonResponse({ success: false, error: 'No event data' });
   }
 
-  var sheet = ss.getSheetByName('Events');
+  // Check for existing sheet (support both old and new name)
+  var sheet = ss.getSheetByName('Events') || ss.getSheetByName('_Events');
   if (!sheet) {
     sheet = ss.insertSheet('Events');
-    var headers = ['EventID', 'Name', 'Date', 'Stages', 'Competitors', 'Updated'];
+    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated'];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.getRange(1, 1, 1, headers.length)
       .setFontWeight('bold')
@@ -125,7 +126,6 @@ function _pushEvent(ss, ev) {
   var row = [
     ev.id,
     ev.name || '',
-    ev.date || '',
     JSON.stringify(ev.stages || []),
     JSON.stringify(ev.competitors || []),
     new Date().toISOString()
@@ -147,20 +147,34 @@ function _pushEvent(ss, ev) {
 /* --- Pull Events --- */
 function _pullEvents() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('Events');
+  var sheet = ss.getSheetByName('Events') || ss.getSheetByName('_Events');
 
   if (!sheet || sheet.getLastRow() < 2) {
     return _jsonResponse({ events: [] });
   }
 
-  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 6).getValues();
+  var numCols = sheet.getLastColumn();
+  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, numCols).getValues();
+
+  // Read headers to find column positions
+  var headers = sheet.getRange(1, 1, 1, numCols).getValues()[0];
+  var colIdx = {};
+  for (var c = 0; c < headers.length; c++) {
+    colIdx[String(headers[c]).toLowerCase().replace(/\s+/g, '')] = c;
+  }
+
   var events = data.map(function(row) {
+    var idCol   = colIdx['eventid'] !== undefined ? colIdx['eventid'] : 0;
+    var nameCol = colIdx['name'] !== undefined ? colIdx['name'] : 1;
+    // Stages/Competitors could be at different positions depending on whether Date column exists
+    var stagesCol = colIdx['stages'] !== undefined ? colIdx['stages'] : (numCols >= 6 ? 3 : 2);
+    var compCol   = colIdx['competitors'] !== undefined ? colIdx['competitors'] : (numCols >= 6 ? 4 : 3);
+
     return {
-      id:          row[0],
-      name:        row[1],
-      date:        row[2],
-      stages:      JSON.parse(row[3] || '[]'),
-      competitors: JSON.parse(row[4] || '[]')
+      id:          row[idCol],
+      name:        row[nameCol],
+      stages:      JSON.parse(row[stagesCol] || '[]'),
+      competitors: JSON.parse(row[compCol] || '[]')
     };
   });
 
