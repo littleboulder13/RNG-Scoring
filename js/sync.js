@@ -11,25 +11,85 @@ function setSyncUrl(url) {
     localStorage.setItem('rng_sync_url', url);
 }
 
-function promptSyncUrl() {
-    if (!promptAdminPin('change the sync URL')) return;
-    const current = getSyncUrl();
-    const url = prompt('Enter the Google Apps Script deployment URL:', current);
-    if (url === null) return;  // cancelled
-    const trimmed = url.trim();
-    if (!trimmed) {
-        alert('URL cannot be empty.');
+function openSettingsModal() {
+    const modal   = $('settings-modal');
+    const gate    = $('settings-pin-gate');
+    const body    = $('settings-body');
+    const pinIn   = $('settings-pin-input');
+    const pinErr  = $('settings-pin-error');
+    const noPin   = $('settings-no-pin-msg');
+    const saveMsg = $('settings-save-msg');
+
+    // Reset state
+    pinIn.value = '';
+    pinErr.style.display = 'none';
+    saveMsg.style.display = 'none';
+    $('settings-admin-pin').value = '';
+
+    if (hasAdminPin()) {
+        // PIN is set — show the PIN gate
+        gate.style.display = '';
+        body.style.display = 'none';
+        noPin.style.display = 'none';
+    } else {
+        // No PIN set — skip gate, go straight to settings
+        gate.style.display = 'none';
+        body.style.display = '';
+    }
+
+    // Pre-fill current URL
+    $('settings-sync-url').value = getSyncUrl();
+
+    modal.style.display = 'flex';
+}
+
+function closeSettingsModal() {
+    $('settings-modal').style.display = 'none';
+}
+
+function unlockSettings() {
+    const entered = $('settings-pin-input').value;
+    if (verifyAdminPin(entered)) {
+        $('settings-pin-gate').style.display = 'none';
+        $('settings-body').style.display = '';
+        $('settings-pin-error').style.display = 'none';
+    } else {
+        $('settings-pin-error').style.display = 'block';
+    }
+}
+
+function saveSettings() {
+    const urlVal = ($('settings-sync-url').value || '').trim();
+    const pinVal = ($('settings-admin-pin').value || '').trim();
+    const msgEl  = $('settings-save-msg');
+
+    if (!urlVal) {
+        msgEl.textContent = 'URL cannot be empty.';
+        msgEl.style.color = 'var(--error-color)';
+        msgEl.style.display = 'block';
         return;
     }
-    if (!trimmed.startsWith('https://script.google.com/')) {
-        if (!confirm('This doesn\u2019t look like a Google Apps Script URL. Save anyway?')) return;
-    }
-    setSyncUrl(trimmed);
-    // Push the new URL to the cloud so other devices pick it up
-    _postToAppsScript({ action: 'pushConfig', config: { syncUrl: trimmed } })
+
+    // Save URL
+    setSyncUrl(urlVal);
+
+    // Save PIN if provided
+    if (pinVal) setAdminPin(pinVal);
+
+    // Push URL to cloud so other devices pick it up
+    _postToAppsScript({ action: 'pushConfig', config: { syncUrl: urlVal } })
         .then(() => console.log('Sync URL pushed to cloud'))
         .catch(err => console.warn('Failed to push sync URL to cloud:', err.message));
-    alert('\u2713 Sync URL updated!');
+
+    msgEl.textContent = '✓ Settings saved!';
+    msgEl.style.color = 'var(--secondary-color)';
+    msgEl.style.display = 'block';
+    setTimeout(() => closeSettingsModal(), 1200);
+}
+
+// Legacy alias — both gear buttons call this
+function promptSyncUrl() {
+    openSettingsModal();
 }
 
 /* --- Auto-sync URL on app load --- */

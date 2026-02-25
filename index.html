@@ -184,6 +184,36 @@
         </main>
     </div>
 
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal-overlay" style="display:none">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>⚙ Settings</h3>
+                <button id="settings-modal-close" class="btn-change-event">✕</button>
+            </div>
+            <div id="settings-pin-gate" class="form-group">
+                <label for="settings-pin-input">Enter Admin PIN</label>
+                <input type="password" id="settings-pin-input" placeholder="PIN..." inputmode="numeric">
+                <button id="settings-pin-submit" class="btn-primary" style="margin-top:0.5rem">Unlock</button>
+                <div id="settings-pin-error" class="form-error" style="display:none">Incorrect PIN.</div>
+                <p id="settings-no-pin-msg" style="display:none; color:#888; font-size:0.85rem; margin-top:0.5rem">No admin PIN is set. You can set one below.</p>
+            </div>
+            <div id="settings-body" style="display:none">
+                <div class="form-group">
+                    <label for="settings-sync-url">Google Apps Script URL</label>
+                    <input type="url" id="settings-sync-url" placeholder="https://script.google.com/...">
+                </div>
+                <div class="form-group">
+                    <label for="settings-admin-pin">Admin PIN</label>
+                    <input type="text" id="settings-admin-pin" placeholder="Set or change PIN..." inputmode="numeric">
+                    <span style="font-size:0.8rem;color:#888">Leave blank to keep current PIN</span>
+                </div>
+                <button id="settings-save-btn" class="btn-primary">Save Settings</button>
+                <div id="settings-save-msg" class="form-error" style="display:none"></div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="js/db.js"></script>
     <script src="js/events.js"></script>

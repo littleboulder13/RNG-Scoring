@@ -284,6 +284,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Settings: sync URL ---
     $('settings-btn').addEventListener('click', promptSyncUrl);
     $('overlay-settings-btn').addEventListener('click', promptSyncUrl);
+    $('settings-modal-close').addEventListener('click', closeSettingsModal);
+    $('settings-pin-submit').addEventListener('click', unlockSettings);
+    $('settings-pin-input').addEventListener('keydown', e => { if (e.key === 'Enter') unlockSettings(); });
+    $('settings-save-btn').addEventListener('click', saveSettings);
 
     // --- Populate UI for active event (immediate, from localStorage) ---
     if (getActiveEvent()) {
