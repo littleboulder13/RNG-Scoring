@@ -260,12 +260,20 @@ async function syncScores() {
 
     const event = getActiveEvent();
     const eventName = event ? event.name : 'Unknown Event';
+    const competitors = event ? (event.competitors || []) : [];
+    const stages = event ? (event.stages || []) : [];
 
     const syncBtn = $('sync-btn');
     if (syncBtn) { syncBtn.disabled = true; syncBtn.textContent = 'Syncing\u2026'; }
 
     try {
-        await _postToAppsScript({ action: 'syncScores', eventName, scores: pending });
+        await _postToAppsScript({
+            action: 'syncScores',
+            eventName,
+            scores: pending,
+            competitors,
+            stages
+        });
 
         for (const s of pending) await markAsSynced(s.id);
         await updateUI();

@@ -47,58 +47,148 @@ function doGet(e) {
   return _jsonResponse({ status: 'ok', message: 'Stilly RNG sync endpoint is running' });
 }
 
-/* --- Score Sync --- */
+/* --- Score Sync (one tab per stage, all competitors listed) --- */
 function _syncScores(ss, data) {
   var scores = Array.isArray(data.scores) ? data.scores : [];
   var eventName = data.eventName || 'Unknown Event';
+  var competitors = Array.isArray(data.competitors) ? data.competitors : [];
+  var stages = Array.isArray(data.stages) ? data.stages : [];
 
   if (!scores.length) {
     return _jsonResponse({ success: false, error: 'No scores provided' });
   }
 
-  var sheet = ss.getSheetByName(eventName);
-  if (!sheet) {
-    sheet = ss.insertSheet(eventName);
-    var headers = [
-      'Shooter', 'Division', 'Stage', 'Time', 'Wait Time',
-      'Targets Not Neutralized', 'DNF', 'Notes', 'Recorded At', 'Synced At'
-    ];
+  var headers = ['#', 'Shooter', 'Division', 'Time (s)', 'Wait Time (m:ss)',
+                 'Targets Not Neutralized', 'Notes'];
+
+  // Helper: format wait time
+  function fmtWait(totalSec) {
+    var m = Math.floor((totalSec || 0) / 60);
+    var s = (totalSec || 0) % 60;
+    return m + ':' + ('0' + s).slice(-2);
+  }
+
+  // Group scores by stage name
+  var scoresByStage = {};
+  for (var i = 0; i < scores.length; i++) {
+    var stageName = scores[i].stage || 'Unknown Stage';
+    if (!scoresByStage[stageName]) scoresByStage[stageName] = [];
+    scoresByStage[stageName].push(scores[i]);
+  }
+
+  // Collect all stage names we need tabs for (event stages + any in scores)
+  var stageNames = [];
+  var stageSet = {};
+  for (var si = 0; si < stages.length; si++) {
+    var sn = stages[si].name || stages[si];
+    if (!stageSet[sn]) { stageNames.push(sn); stageSet[sn] = true; }
+  }
+  for (var key in scoresByStage) {
+    if (!stageSet[key]) { stageNames.push(key); stageSet[key] = true; }
+  }
+
+  var totalSynced = 0;
+
+  for (var si2 = 0; si2 < stageNames.length; si2++) {
+    var stage = stageNames[si2];
+    var tabName = (eventName + ' - ' + stage).substring(0, 100);
+
+    var sheet = ss.getSheetByName(tabName);
+    var isNew = false;
+    if (!sheet) {
+      sheet = ss.insertSheet(tabName);
+      isNew = true;
+    }
+
+    // Build score lookup: playerName → score (first occurrence wins)
+    var stageScores = scoresByStage[stage] || [];
+
+    // Read existing scores already in the sheet (rows 2+)
+    var existingMap = {};
+    if (!isNew && sheet.getLastRow() >= 2) {
+      var existData = sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getValues();
+      for (var ex = 0; ex < existData.length; ex++) {
+        var exName = String(existData[ex][1]).trim();
+        if (exName && existData[ex][3] !== '') {
+          existingMap[exName] = {
+            time: existData[ex][3],
+            waitTime: existData[ex][4],
+            tnt: existData[ex][5],
+            notes: existData[ex][6]
+          };
+        }
+      }
+    }
+
+    // Merge new scores into lookup (new scores overwrite)
+    var scoreMap = {};
+    // Start with existing
+    for (var ek in existingMap) { scoreMap[ek] = existingMap[ek]; }
+    // Overlay new scores
+    for (var ns = 0; ns < stageScores.length; ns++) {
+      var sc = stageScores[ns];
+      var pn = sc.playerName || '';
+      if (pn) {
+        scoreMap[pn] = {
+          time: sc.dnf ? 'DNF' : (sc.time || 0),
+          waitTime: fmtWait(sc.waitTime),
+          tnt: sc.targetsNotNeutralized || 0,
+          notes: sc.notes || ''
+        };
+      }
+    }
+
+    // Build full competitor list (event competitors + anyone with scores)
+    var compList = [];
+    var compSet = {};
+    for (var ci = 0; ci < competitors.length; ci++) {
+      var cn = competitors[ci].name || '';
+      if (cn && !compSet[cn]) {
+        compList.push({ name: cn, division: competitors[ci].division || '' });
+        compSet[cn] = true;
+      }
+    }
+    // Add any scored players not in the competitor list
+    for (var sp in scoreMap) {
+      if (!compSet[sp]) {
+        compList.push({ name: sp, division: '' });
+        compSet[sp] = true;
+      }
+    }
+
+    // Build rows
+    var rows = [];
+    for (var ri = 0; ri < compList.length; ri++) {
+      var comp = compList[ri];
+      var s = scoreMap[comp.name];
+      if (s) {
+        rows.push([ri + 1, comp.name, comp.division, s.time, s.waitTime, s.tnt, s.notes]);
+      } else {
+        rows.push([ri + 1, comp.name, comp.division, '', '', '', '']);
+      }
+    }
+
+    // Write the sheet (clear and rewrite to keep it clean)
+    sheet.clear();
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.getRange(1, 1, 1, headers.length)
       .setFontWeight('bold')
       .setBackground('#2c5f2d')
       .setFontColor('#ffffff');
     sheet.setFrozenRows(1);
+
+    if (rows.length) {
+      sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+    }
+
+    for (var col = 1; col <= headers.length; col++) {
+      sheet.autoResizeColumn(col);
+    }
+
+    totalSynced += stageScores.length;
   }
 
-  var syncedAt = new Date().toISOString();
-  var rows = scores.map(function(s) {
-    var waitMin = Math.floor((s.waitTime || 0) / 60);
-    var waitSec = (s.waitTime || 0) % 60;
-    var waitStr = waitMin + ':' + ('0' + waitSec).slice(-2);
-
-    return [
-      s.playerName || '',
-      s.division || '',
-      s.stage || '',
-      s.dnf ? 'DNF' : (s.time || 0),
-      waitStr,
-      s.targetsNotNeutralized || 0,
-      s.dnf ? 'Yes' : 'No',
-      s.notes || '',
-      s.timestamp || '',
-      syncedAt
-    ];
-  });
-
-  sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length)
-    .setValues(rows);
-
-  for (var i = 1; i <= rows[0].length; i++) {
-    sheet.autoResizeColumn(i);
-  }
-
-  return _jsonResponse({ success: true, count: rows.length });
+  return _jsonResponse({ success: true, count: totalSynced });
 }
 
 /* --- Push Event Config --- */
