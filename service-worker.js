@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rng-scoring-v49';
+const CACHE_NAME = 'rng-scoring-v50';
 const urlsToCache = [
     './',
     './index.html',
@@ -26,25 +26,28 @@ self.addEventListener('install', (event) => {
     );
 });
 
-// Fetch from cache first, then network (skip cache for API calls)
+// Network-first strategy: try network, fall back to cache for offline use
 self.addEventListener('fetch', (event) => {
     const url = event.request.url;
 
-    // Always go to network for Google Apps Script API calls (including redirects)
+    // Don't intercept API calls
     if (url.includes('script.google.com') || url.includes('googleusercontent.com')) {
-        // Don't intercept — let the browser handle it natively
         return;
     }
 
     event.respondWith(
-        caches.match(event.request)
+        fetch(event.request)
             .then((response) => {
-                if (response) {
-                    return response;
-                }
-                return fetch(event.request);
+                // Got a fresh response — update the cache
+                const clone = response.clone();
+                caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+                return response;
             })
-            .catch(() => caches.match('./index.html'))
+            .catch(() => {
+                // Offline — serve from cache
+                return caches.match(event.request)
+                    .then((cached) => cached || caches.match('./index.html'));
+            })
     );
 });
 
