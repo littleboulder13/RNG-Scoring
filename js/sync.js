@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxoD1vYRzXA6-gHyaBMmEhUx4_7NWbQQmSbCFdwMSmlCT-0Xj8aD5jach-g1rxGI9jP/exec';
+const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbyCxJFGjMnnGU4WIJgC66ZAQkdBd-5OciDVOiTjAcR1fTJznDeqyJdi9ntzqyye_Rub/exec';
 
 function getSyncUrl() {
     return localStorage.getItem('rng_sync_url') || DEFAULT_SYNC_URL;
