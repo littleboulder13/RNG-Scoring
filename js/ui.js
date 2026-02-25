@@ -2,29 +2,6 @@
    UI — Render Lists, Dropdowns, Display Helpers
    ============================================================= */
 
-// --- Competitors List (read-only view in Competitors tab) ---
-function renderCompetitorsList() {
-    const el = $('competitors-list');
-    if (!el) return;
-    const players = getPlayers();
-
-    if (!players.length) {
-        el.innerHTML = '<div class="empty-state">No competitors in this event. Edit the event to add competitors.</div>';
-        return;
-    }
-
-    el.innerHTML = players.map(p => `
-        <div class="competitor-item">
-            <div class="stage-view">
-                <div class="competitor-info">
-                    <span class="competitor-name">${p.name}</span>
-                    ${p.division ? `<span class="competitor-division-tag">${p.division}</span>` : ''}
-                </div>
-            </div>
-        </div>
-    `).join('');
-}
-
 // --- Player Dropdown ---
 function populatePlayerDropdown() {
     const sel = $('player-name');
@@ -39,85 +16,6 @@ function populatePlayerDropdown() {
         sel.appendChild(opt);
     });
     if (prev && players.find(p => p.name === prev)) sel.value = prev;
-}
-
-// --- Stages List (with inline edit) ---
-function renderStagesList() {
-    const el = $('stages-list');
-    if (!el) return;
-    const stages = getStages();
-
-    if (!stages.length) {
-        el.innerHTML = '<div class="empty-state">No stages yet. Add stages above to get started.</div>';
-        return;
-    }
-
-    el.innerHTML = stages.map(s => {
-        const meta = [
-            s.targets ? `${s.targets} targets` : '',
-            s.par     ? `PAR: ${s.par}s`        : ''
-        ].filter(Boolean).join(' · ');
-        return `
-        <div class="competitor-item" data-stage-name="${s.name}">
-            <div class="stage-view">
-                <span class="competitor-name">
-                    ${s.name}${meta ? ` <em style="color:#888;font-size:0.85em">(${meta})</em>` : ''}
-                </span>
-                <div class="item-actions">
-                    <button class="btn-edit" data-name="${s.name}">Edit</button>
-                    <button class="btn-delete" data-name="${s.name}">Remove</button>
-                </div>
-            </div>
-            <div class="stage-edit" style="display:none">
-                <input type="text" class="edit-name" value="${s.name}" placeholder="Stage name">
-                <input type="number" class="edit-targets" value="${s.targets}" placeholder="# of targets" min="0" style="width:110px">
-                <input type="number" class="edit-par" value="${s.par}" placeholder="PAR (s)" min="0" step="0.01" style="width:110px">
-                <div class="edit-actions">
-                    <button class="btn-save-edit" data-name="${s.name}">Save</button>
-                    <button class="btn-cancel-edit">Cancel</button>
-                </div>
-            </div>
-        </div>`;
-    }).join('');
-
-    // Remove
-    el.querySelectorAll('.btn-delete').forEach(btn =>
-        btn.addEventListener('click', () => removeStage(btn.dataset.name))
-    );
-
-    // Edit → show inline form
-    el.querySelectorAll('.btn-edit').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const row = btn.closest('.competitor-item');
-            row.querySelector('.stage-view').style.display = 'none';
-            row.querySelector('.stage-edit').style.display = '';
-            row.querySelector('.edit-name').focus();
-        });
-    });
-
-    // Cancel edit
-    el.querySelectorAll('.btn-cancel-edit').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const row = btn.closest('.competitor-item');
-            row.querySelector('.stage-view').style.display = '';
-            row.querySelector('.stage-edit').style.display = 'none';
-        });
-    });
-
-    // Save edit
-    el.querySelectorAll('.btn-save-edit').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const row     = btn.closest('.competitor-item');
-            const newName = row.querySelector('.edit-name').value.trim();
-            if (!newName) return;
-            updateStage(
-                btn.dataset.name,
-                newName,
-                row.querySelector('.edit-targets').value.trim(),
-                row.querySelector('.edit-par').value.trim()
-            );
-        });
-    });
 }
 
 // --- Stage Dropdown ---
@@ -238,10 +136,10 @@ function renderEventOverlay() {
                     \uD83D\uDCC5 ${e.date || 'No date set'}
                     &nbsp;·&nbsp; \uD83C\uDFAF ${e.stages.length} stage${e.stages.length !== 1 ? 's' : ''}
                     &nbsp;·&nbsp; \uD83D\uDC65 ${e.competitors.length} shooter${e.competitors.length !== 1 ? 's' : ''}
-
                 </div>
             </div>
             <div class="event-card-actions">
+                <button class="btn-edit-event" data-id="${e.id}">✎ Edit</button>
                 <button class="btn-select-event" data-id="${e.id}">Select</button>
                 <button class="btn-delete-event" data-id="${e.id}">\u2715</button>
             </div>
@@ -260,4 +158,177 @@ function updateActiveEventBar() {
     } else {
         bar.style.display = 'none';
     }
+}
+
+/* =============================================================
+   Event Editor — open / close / save / competitor list
+   ============================================================= */
+let editingEventId = null;
+
+function openEventEditor(eventId) {
+    const ev = getEventById(eventId);
+    if (!ev) return;
+    editingEventId = eventId;
+
+    // Populate fields
+    $('event-editor-title').textContent = `Edit: ${ev.name}`;
+    $('edit-event-name').value = ev.name;
+    $('edit-event-date').value = ev.date || '';
+    renderEditCompetitorsList();
+    renderEditStagesList();
+
+    // Hide the cards, create section & cloud bar; show editor
+    $('event-cards').style.display = 'none';
+    document.querySelector('.event-create-section').style.display = 'none';
+    document.querySelector('.event-cloud-bar').style.display = 'none';
+    $('event-editor').style.display = '';
+}
+
+function closeEventEditor() {
+    editingEventId = null;
+    $('event-editor').style.display = 'none';
+    $('event-cards').style.display = '';
+    document.querySelector('.event-create-section').style.display = '';
+    document.querySelector('.event-cloud-bar').style.display = '';
+    renderEventOverlay();
+}
+
+function saveEventEditorFields() {
+    if (!editingEventId) return;
+    const name = $('edit-event-name').value.trim();
+    const date = $('edit-event-date').value;
+    if (!name) return;
+    updateEvent(editingEventId, { name, date });
+}
+
+function renderEditCompetitorsList() {
+    const el = $('edit-competitors-list');
+    if (!el || !editingEventId) return;
+    const ev = getEventById(editingEventId);
+    if (!ev) return;
+
+    if (!ev.competitors.length) {
+        el.innerHTML = '<div class="empty-state">No competitors yet.</div>';
+        return;
+    }
+
+    el.innerHTML = ev.competitors.map(p => `
+        <div class="competitor-item">
+            <div class="stage-view">
+                <div class="competitor-info">
+                    <span class="competitor-name">${p.name}</span>
+                    ${p.division ? `<span class="competitor-division-tag">${p.division}</span>` : ''}
+                </div>
+                <div class="item-actions">
+                    <button class="btn-delete" data-name="${p.name}">Remove</button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+
+    // Wire up remove buttons
+    el.querySelectorAll('.btn-delete').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const evNow = getEventById(editingEventId);
+            if (!evNow) return;
+            evNow.competitors = evNow.competitors.filter(c => c.name !== btn.dataset.name);
+            updateEvent(editingEventId, { competitors: evNow.competitors });
+            renderEditCompetitorsList();
+        });
+    });
+}
+
+function renderEditStagesList() {
+    const el = $('edit-stages-list');
+    if (!el || !editingEventId) return;
+    const ev = getEventById(editingEventId);
+    if (!ev) return;
+
+    if (!ev.stages.length) {
+        el.innerHTML = '<div class="empty-state">No stages yet.</div>';
+        return;
+    }
+
+    el.innerHTML = ev.stages.map(s => {
+        const meta = [
+            s.targets ? `${s.targets} targets` : '',
+            s.par     ? `PAR: ${s.par}s`        : ''
+        ].filter(Boolean).join(' · ');
+        return `
+        <div class="competitor-item" data-stage-name="${s.name}">
+            <div class="stage-view">
+                <span class="competitor-name">
+                    ${s.name}${meta ? ` <em style="color:#888;font-size:0.85em">(${meta})</em>` : ''}
+                </span>
+                <div class="item-actions">
+                    <button class="btn-edit" data-name="${s.name}">Edit</button>
+                    <button class="btn-delete" data-name="${s.name}">Remove</button>
+                </div>
+            </div>
+            <div class="stage-edit" style="display:none">
+                <input type="text" class="edit-name" value="${s.name}" placeholder="Stage name">
+                <input type="number" class="edit-targets" value="${s.targets}" placeholder="# targets" min="0" style="width:100px">
+                <input type="number" class="edit-par" value="${s.par}" placeholder="PAR (s)" min="0" step="0.01" style="width:100px">
+                <div class="edit-actions">
+                    <button class="btn-save-edit" data-name="${s.name}">Save</button>
+                    <button class="btn-cancel-edit">Cancel</button>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+
+    // Remove
+    el.querySelectorAll('.btn-delete').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const evNow = getEventById(editingEventId);
+            if (!evNow) return;
+            evNow.stages = evNow.stages.filter(s => s.name !== btn.dataset.name);
+            updateEvent(editingEventId, { stages: evNow.stages });
+            renderEditStagesList();
+        });
+    });
+
+    // Edit → show inline form
+    el.querySelectorAll('.btn-edit').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const row = btn.closest('.competitor-item');
+            row.querySelector('.stage-view').style.display = 'none';
+            row.querySelector('.stage-edit').style.display = '';
+            row.querySelector('.edit-name').focus();
+        });
+    });
+
+    // Cancel edit
+    el.querySelectorAll('.btn-cancel-edit').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const row = btn.closest('.competitor-item');
+            row.querySelector('.stage-view').style.display = '';
+            row.querySelector('.stage-edit').style.display = 'none';
+        });
+    });
+
+    // Save edit
+    el.querySelectorAll('.btn-save-edit').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const evNow = getEventById(editingEventId);
+            if (!evNow) return;
+            const row     = btn.closest('.competitor-item');
+            const newName = row.querySelector('.edit-name').value.trim();
+            if (!newName) return;
+            const oldName = btn.dataset.name;
+            if (newName !== oldName && evNow.stages.find(s => s.name === newName)) {
+                alert(`Stage "${newName}" already exists.`);
+                return;
+            }
+            const idx = evNow.stages.findIndex(s => s.name === oldName);
+            if (idx === -1) return;
+            evNow.stages[idx] = {
+                name: newName,
+                targets: row.querySelector('.edit-targets').value.trim(),
+                par:     row.querySelector('.edit-par').value.trim()
+            };
+            updateEvent(editingEventId, { stages: evNow.stages });
+            renderEditStagesList();
+        });
+    });
 }

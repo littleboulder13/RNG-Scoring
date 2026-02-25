@@ -28,6 +28,9 @@
             <div id="event-cards" class="event-cards">
                 <!-- Event cards rendered dynamically -->
             </div>
+            <div class="event-cloud-bar">
+                <button id="pull-events-btn" class="btn-cloud-pull">⬇ Pull Events from Cloud</button>
+            </div>
             <div class="event-create-section">
                 <h3>Create New Event</h3>
                 <input type="text" id="new-event-name" placeholder="Event name...">
@@ -64,6 +67,17 @@
                 <div id="edit-competitors-list" class="edit-competitors-list">
                     <!-- Competitor items rendered here -->
                 </div>
+                <hr class="editor-divider">
+                <h4>Stages</h4>
+                <div class="add-competitor-form">
+                    <input type="text" id="edit-stage-name" placeholder="Stage name...">
+                    <input type="number" id="edit-stage-targets" placeholder="# targets" min="0" style="width:100px">
+                    <input type="number" id="edit-stage-par" placeholder="PAR (s)" min="0" step="0.01" style="width:100px">
+                    <button type="button" id="edit-add-stage-btn" class="btn-primary">Add</button>
+                </div>
+                <div id="edit-stages-list" class="edit-competitors-list">
+                    <!-- Stage items rendered here -->
+                </div>
                 <button id="event-editor-done" class="btn-primary" style="margin-top:1rem">Done</button>
             </div>
         </div>
@@ -96,8 +110,6 @@
         <main>
             <nav class="tab-bar">
                 <button class="tab-btn active" data-tab="score-entry">Score Entry</button>
-                <button class="tab-btn" data-tab="competitors">Competitors</button>
-                <button class="tab-btn" data-tab="stages">Stages</button>
                 <button class="tab-btn" data-tab="scores">Scores</button>
             </nav>
 
@@ -151,36 +163,17 @@
                 </section>
             </div>
 
-            <div id="tab-competitors" class="tab-content">
-                <section class="competitors-mgmt">
-                    <h2>Competitors</h2>
-                    <div id="competitors-list">
-                        <!-- Competitors will be populated here -->
-                    </div>
-                </section>
-            </div>
-
-            <div id="tab-stages" class="tab-content">
-                <section class="competitors-mgmt">
-                    <h2>Manage Stages</h2>
-                    <div class="add-competitor-form">
-                        <input type="text" id="stage-name-input" placeholder="Enter stage name...">
-                        <input type="number" id="stage-targets-input" placeholder="# of targets" min="0" style="width:120px">
-                        <input type="number" id="stage-par-input" placeholder="PAR time (s)" min="0" step="0.01" style="width:130px">
-                        <button type="button" id="add-stage-mgmt-btn" class="btn-primary">Add</button>
-                    </div>
-                    <div id="stages-list">
-                        <!-- Stages will be populated here -->
-                    </div>
-                </section>
-            </div>
-
             <div id="tab-scores" class="tab-content">
                 <section class="scores-list">
                     <h2>Recent Scores</h2>
                     <div class="sync-info">
-                        <span id="pending-count">0</span> scores pending sync
-                        <button id="sync-btn" class="btn-secondary">Sync Now</button>
+                        <div class="sync-top-row">
+                            <span><span id="pending-count">0</span> scores pending sync</span>
+                            <span id="sync-status-badge" class="sync-status-badge connected">☁ Connected</span>
+                        </div>
+                        <div class="sync-actions">
+                            <button id="sync-btn" class="btn-secondary">Sync Now</button>
+                        </div>
                     </div>
                     <div class="export-bar">
                         <button id="export-excel-btn" class="btn-export">⬇ Export to Excel</button>

@@ -68,7 +68,7 @@ async function init() {
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
     window.addEventListener('online', async () => {
-        if ((await getPendingScores()).length) setTimeout(syncScores, 1000);
+        if (SYNC_URL && (await getPendingScores()).length) setTimeout(syncScores, 1000);
     });
 }
 
@@ -106,9 +106,7 @@ async function refreshAfterEventChange() {
     if (!event) return;
     updateActiveEventBar();
     populatePlayerDropdown();
-    renderCompetitorsList();
     populateStageDropdown();
-    renderStagesList();
     showStageInfo();
     showShooterDivision();
     try { await updateUI(); } catch (e) { /* DB may not be ready yet */ }
@@ -119,19 +117,10 @@ async function refreshAfterEventChange() {
    ============================================================= */
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- Tab switching (with admin PIN gate on Stages) ---
+    // --- Tab switching ---
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const tab = btn.dataset.tab;
-
-            // PIN-protect Stages tab
-            if (tab === 'stages' && !adminAuthenticated) {
-                if (hasAdminPin()) {
-                    if (!promptAdminPin('access Stages')) return;
-                    adminAuthenticated = true;
-                }
-            }
-
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             btn.classList.add('active');
@@ -181,6 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!name) { alert('Please enter an event name.'); return; }
         const date = $('new-event-date').value;
         const event = createEvent(name, date);
+        pushEventConfig(event.id);  // sync to cloud
         $('new-event-name').value = '';
         $('new-event-date').value = '';
         selectEvent(event.id);
@@ -219,6 +209,8 @@ document.addEventListener('DOMContentLoaded', () => {
         saveEventEditorFields();
         const wasEditingId = editingEventId;
         closeEventEditor();
+        // Push updated event to cloud
+        if (wasEditingId) pushEventConfig(wasEditingId);
         // If this event is the active one, refresh the main UI
         if (wasEditingId === getActiveEventId()) {
             refreshAfterEventChange();
@@ -254,17 +246,26 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Set default date on create form ---
     $('new-event-date').valueAsDate = new Date();
 
-    // --- Stages tab ---
-    $('add-stage-mgmt-btn').addEventListener('click', () => {
-        const name = $('stage-name-input').value.trim();
-        if (!name) return;
-        addStage(name, $('stage-targets-input').value.trim(), $('stage-par-input').value.trim());
-        $('stage-name-input').value = '';
-        $('stage-targets-input').value = '';
-        $('stage-par-input').value = '';
+    // --- Event Editor: add stage ---
+    $('edit-add-stage-btn').addEventListener('click', () => {
+        const name = $('edit-stage-name').value.trim();
+        if (!name || !editingEventId) return;
+        const ev = getEventById(editingEventId);
+        if (!ev) return;
+        if (ev.stages.find(s => s.name === name)) { alert(`Stage "${name}" already exists.`); return; }
+        ev.stages.push({
+            name,
+            targets: $('edit-stage-targets').value.trim(),
+            par:     $('edit-stage-par').value.trim()
+        });
+        updateEvent(editingEventId, { stages: ev.stages });
+        $('edit-stage-name').value = '';
+        $('edit-stage-targets').value = '';
+        $('edit-stage-par').value = '';
+        renderEditStagesList();
     });
-    $('stage-name-input').addEventListener('keypress', e => {
-        if (e.key === 'Enter') { e.preventDefault(); $('add-stage-mgmt-btn').click(); }
+    $('edit-stage-name').addEventListener('keypress', e => {
+        if (e.key === 'Enter') { e.preventDefault(); $('edit-add-stage-btn').click(); }
     });
 
     // --- Score Entry tab ---
@@ -276,13 +277,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Scores tab ---
     $('sync-btn').addEventListener('click', syncScores);
     $('export-excel-btn').addEventListener('click', exportToExcel);
+    updateSyncStatus();
+
+    // --- Event overlay: Pull from cloud ---
+    $('pull-events-btn').addEventListener('click', pullEvents);
 
     // --- Populate UI for active event (immediate, from localStorage) ---
     if (getActiveEvent()) {
         populatePlayerDropdown();
-        renderCompetitorsList();
         populateStageDropdown();
-        renderStagesList();
         updateActiveEventBar();
     }
 

@@ -36,7 +36,6 @@ async function importFromExcel(file) {
     players.sort((a, b) => a.name.localeCompare(b.name));
     savePlayers(players);
     populatePlayerDropdown();
-    renderCompetitorsList();
     alert(`Successfully imported ${imported} competitor(s).`);
 }
 

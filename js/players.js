@@ -23,13 +23,11 @@ function addPlayer(name, division = '') {
     players.sort((a, b) => a.name.localeCompare(b.name));
     savePlayers(players);
     populatePlayerDropdown();
-    renderCompetitorsList();
 }
 
 function removePlayer(name) {
     savePlayers(getPlayers().filter(p => p.name !== name));
     populatePlayerDropdown();
-    renderCompetitorsList();
 }
 
 function getPlayerDivision(name) {

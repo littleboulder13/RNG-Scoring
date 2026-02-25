@@ -268,13 +268,84 @@ button {
 }
 
 .sync-info {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     padding: 0.75rem;
     background: #fff3e0;
     border-radius: 4px;
     margin-bottom: 1rem;
+}
+
+.sync-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.sync-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.sync-actions .btn-secondary {
+    flex: 1;
+}
+
+.btn-sync-setup {
+    background: transparent;
+    border: 1px solid #999;
+    color: #555;
+    padding: 0.45rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.btn-sync-setup:hover {
+    background: #f0f0f0;
+}
+
+.sync-status-badge {
+    font-size: 0.78rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+    font-weight: 500;
+}
+
+.sync-status-badge.connected {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.sync-status-badge.not-configured {
+    background: #fff3e0;
+    color: #e65100;
+}
+
+.event-cloud-bar {
+    text-align: center;
+    margin: 0.75rem 0;
+}
+
+.btn-cloud-pull {
+    background: #e3f2fd;
+    color: #1565c0;
+    border: 1px solid #90caf9;
+    padding: 0.6rem 1.25rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    width: 100%;
+}
+
+.btn-cloud-pull:hover {
+    background: #bbdefb;
+}
+
+.btn-cloud-pull:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 .score-item {
