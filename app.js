@@ -274,7 +274,8 @@ document.addEventListener('DOMContentLoaded', () => {
     $('export-excel-btn').addEventListener('click', exportToExcel);
     updateSyncStatus();
 
-    // --- Event overlay: Pull from cloud ---
+    // --- Event overlay: Push / Pull cloud ---
+    $('push-events-btn').addEventListener('click', pushAllEvents);
     $('pull-events-btn').addEventListener('click', pullEvents);
 
     // --- Populate UI for active event (immediate, from localStorage) ---

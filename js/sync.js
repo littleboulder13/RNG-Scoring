@@ -17,14 +17,62 @@ async function pushEventConfig(eventId) {
     if (!ev) return;
 
     try {
-        await fetch(SYNC_URL, {
+        const res = await fetch(SYNC_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({ action: 'pushEvent', event: ev })
         });
+        const text = await res.text();
+        let result;
+        try { result = JSON.parse(text); } catch (_) { result = null; }
+        if (!result || !result.success) {
+            console.warn('Event push response:', text.substring(0, 200));
+        }
     } catch (err) {
         console.warn('Event push failed (will retry):', err.message);
     }
+}
+
+/* --- Push ALL local events to the cloud --- */
+async function pushAllEvents() {
+    if (!navigator.onLine) return alert('Cannot push events while offline.');
+
+    const events = getEvents();
+    if (!events.length) return alert('No local events to push.');
+
+    const pushBtn = $('push-events-btn');
+    if (pushBtn) { pushBtn.disabled = true; pushBtn.textContent = 'Pushing\u2026'; }
+
+    let success = 0, failed = 0;
+    for (const ev of events) {
+        try {
+            const res = await fetch(SYNC_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({ action: 'pushEvent', event: ev })
+            });
+            const text = await res.text();
+            let result;
+            try { result = JSON.parse(text); } catch (_) { result = null; }
+            if (result && result.success) {
+                success++;
+            } else {
+                failed++;
+                console.warn('Push failed for', ev.name, ':', text.substring(0, 200));
+            }
+        } catch (err) {
+            failed++;
+            console.warn('Push error for', ev.name, ':', err.message);
+        }
+    }
+
+    if (failed === 0) {
+        alert(`\u2713 Pushed ${success} event(s) to the cloud!`);
+    } else {
+        alert(`Pushed ${success} event(s). ${failed} failed — check your connection and try again.`);
+    }
+
+    if (pushBtn) { pushBtn.disabled = false; pushBtn.textContent = '\u2B06 Push Events to Cloud'; }
 }
 
 /* --- Pull all events from the cloud and merge into localStorage --- */

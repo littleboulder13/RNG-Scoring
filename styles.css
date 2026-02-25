@@ -325,6 +325,29 @@ button {
 .event-cloud-bar {
     text-align: center;
     margin: 0.75rem 0;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-cloud-push {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #a5d6a7;
+    padding: 0.6rem 1.25rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    flex: 1;
+}
+
+.btn-cloud-push:hover {
+    background: #c8e6c9;
+}
+
+.btn-cloud-push:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 .btn-cloud-pull {
@@ -336,7 +359,7 @@ button {
     font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
-    width: 100%;
+    flex: 1;
 }
 
 .btn-cloud-pull:hover {

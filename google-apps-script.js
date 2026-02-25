@@ -99,9 +99,9 @@ function _pushEvent(ss, ev) {
     return _jsonResponse({ success: false, error: 'No event data' });
   }
 
-  var sheet = ss.getSheetByName('_Events');
+  var sheet = ss.getSheetByName('Events');
   if (!sheet) {
-    sheet = ss.insertSheet('_Events');
+    sheet = ss.insertSheet('Events');
     var headers = ['EventID', 'Name', 'Date', 'Stages', 'Competitors', 'Updated'];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.getRange(1, 1, 1, headers.length)
@@ -147,7 +147,7 @@ function _pushEvent(ss, ev) {
 /* --- Pull Events --- */
 function _pullEvents() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('_Events');
+  var sheet = ss.getSheetByName('Events');
 
   if (!sheet || sheet.getLastRow() < 2) {
     return _jsonResponse({ events: [] });
