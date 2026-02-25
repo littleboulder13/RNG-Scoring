@@ -283,6 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Settings: sync URL ---
     $('settings-btn').addEventListener('click', promptSyncUrl);
+    $('overlay-settings-btn').addEventListener('click', promptSyncUrl);
 
     // --- Populate UI for active event (immediate, from localStorage) ---
     if (getActiveEvent()) {

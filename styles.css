@@ -778,6 +778,16 @@ button {
     width: 100%;
     max-width: 500px;
     padding: 1rem 0;
+    position: relative;
+}
+
+.overlay-settings {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    color: #555;
+    font-size: 1.6rem;
+    z-index: 10;
 }
 
 .event-overlay-header {
