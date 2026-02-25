@@ -1,7 +1,32 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const SYNC_URL = 'https://script.google.com/macros/s/AKfycbxoD1vYRzXA6-gHyaBMmEhUx4_7NWbQQmSbCFdwMSmlCT-0Xj8aD5jach-g1rxGI9jP/exec';
+const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxoD1vYRzXA6-gHyaBMmEhUx4_7NWbQQmSbCFdwMSmlCT-0Xj8aD5jach-g1rxGI9jP/exec';
+
+function getSyncUrl() {
+    return localStorage.getItem('rng_sync_url') || DEFAULT_SYNC_URL;
+}
+
+function setSyncUrl(url) {
+    localStorage.setItem('rng_sync_url', url);
+}
+
+function promptSyncUrl() {
+    if (!promptAdminPin('change the sync URL')) return;
+    const current = getSyncUrl();
+    const url = prompt('Enter the Google Apps Script deployment URL:', current);
+    if (url === null) return;  // cancelled
+    const trimmed = url.trim();
+    if (!trimmed) {
+        alert('URL cannot be empty.');
+        return;
+    }
+    if (!trimmed.startsWith('https://script.google.com/')) {
+        if (!confirm('This doesn\u2019t look like a Google Apps Script URL. Save anyway?')) return;
+    }
+    setSyncUrl(trimmed);
+    alert('\u2713 Sync URL updated!');
+}
 
 function updateSyncStatus() {
     const badge = $('sync-status-badge');
@@ -17,7 +42,7 @@ async function pushEventConfig(eventId) {
     if (!ev) return;
 
     try {
-        const res = await fetch(SYNC_URL, {
+        const res = await fetch(getSyncUrl(), {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({ action: 'pushEvent', event: ev })
@@ -46,7 +71,7 @@ async function pushAllEvents() {
     let success = 0, failed = 0;
     for (const ev of events) {
         try {
-            const res = await fetch(SYNC_URL, {
+            const res = await fetch(getSyncUrl(), {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain' },
                 body: JSON.stringify({ action: 'pushEvent', event: ev })
@@ -84,7 +109,7 @@ async function pullEvents() {
 
     try {
         // Cache-bust to prevent stale responses
-        const res = await fetch(SYNC_URL + '?action=pullEvents&_t=' + Date.now());
+        const res = await fetch(getSyncUrl() + '?action=pullEvents&_t=' + Date.now());
         if (!res.ok) {
             alert('Pull failed: server returned ' + res.status + ' ' + res.statusText);
             return;
@@ -149,7 +174,7 @@ async function syncScores() {
     if (syncBtn) { syncBtn.disabled = true; syncBtn.textContent = 'Syncing…'; }
 
     try {
-        await fetch(SYNC_URL, {
+        await fetch(getSyncUrl(), {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({ action: 'syncScores', eventName, scores: pending })

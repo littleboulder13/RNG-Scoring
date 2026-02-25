@@ -278,6 +278,9 @@ document.addEventListener('DOMContentLoaded', () => {
     $('push-events-btn').addEventListener('click', pushAllEvents);
     $('pull-events-btn').addEventListener('click', pullEvents);
 
+    // --- Settings: sync URL ---
+    $('settings-btn').addEventListener('click', promptSyncUrl);
+
     // --- Populate UI for active event (immediate, from localStorage) ---
     if (getActiveEvent()) {
         populatePlayerDropdown();
