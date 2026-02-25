@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rng-scoring-v39';
+const CACHE_NAME = 'rng-scoring-v40';
 const urlsToCache = [
     '/',
     '/index.html',
@@ -25,8 +25,14 @@ self.addEventListener('install', (event) => {
     );
 });
 
-// Fetch from cache first, then network
+// Fetch from cache first, then network (skip cache for API calls)
 self.addEventListener('fetch', (event) => {
+    // Always go to network for Google Apps Script API calls
+    if (event.request.url.includes('script.google.com')) {
+        event.respondWith(fetch(event.request));
+        return;
+    }
+
     event.respondWith(
         caches.match(event.request)
             .then((response) => {
