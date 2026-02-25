@@ -57,6 +57,18 @@ function deleteEvent(id) {
     if (getActiveEventId() === id) clearActiveEvent();
 }
 
+function updateEvent(id, updates) {
+    const events = getEvents();
+    const idx = events.findIndex(e => e.id === id);
+    if (idx === -1) return;
+    Object.assign(events[idx], updates);
+    saveEvents(events);
+}
+
+function getEventById(id) {
+    return getEvents().find(e => e.id === id) || null;
+}
+
 function getActiveEventId() {
     return localStorage.getItem('rng_active_event') || '';
 }

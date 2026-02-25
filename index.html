@@ -34,6 +34,38 @@
                 <input type="date" id="new-event-date">
                 <button id="create-event-btn" class="btn-primary">Create Event</button>
             </div>
+
+            <!-- Event Editor (shown when editing an event) -->
+            <div id="event-editor" class="event-editor" style="display:none">
+                <div class="event-editor-header">
+                    <h3 id="event-editor-title">Edit Event</h3>
+                    <button id="event-editor-close" class="btn-change-event">✕ Close</button>
+                </div>
+                <div class="form-group">
+                    <label>Event Name</label>
+                    <input type="text" id="edit-event-name" placeholder="Event name...">
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" id="edit-event-date">
+                </div>
+                <hr class="editor-divider">
+                <h4>Competitors</h4>
+                <div class="add-competitor-form">
+                    <input type="text" id="edit-competitor-name" placeholder="Competitor name...">
+                    <input type="text" id="edit-competitor-division" placeholder="Division...">
+                    <button type="button" id="edit-add-competitor-btn" class="btn-primary">Add</button>
+                </div>
+                <div class="import-bar">
+                    <label class="btn-import" for="edit-import-excel">⬆ Import from Excel</label>
+                    <input type="file" id="edit-import-excel" accept=".xlsx,.xls" style="display:none">
+                    <span class="import-hint">Column A: Name · Column B: Division</span>
+                </div>
+                <div id="edit-competitors-list" class="edit-competitors-list">
+                    <!-- Competitor items rendered here -->
+                </div>
+                <button id="event-editor-done" class="btn-primary" style="margin-top:1rem">Done</button>
+            </div>
         </div>
     </div>
 
@@ -121,17 +153,7 @@
 
             <div id="tab-competitors" class="tab-content">
                 <section class="competitors-mgmt">
-                    <h2>Manage Competitors</h2>
-                    <div class="add-competitor-form">
-                        <input type="text" id="competitor-name-input" placeholder="Competitor name...">
-                        <input type="text" id="competitor-division-input" placeholder="Division...">
-                        <button type="button" id="add-competitor-btn" class="btn-primary">Add</button>
-                    </div>
-                    <div class="import-bar">
-                        <label class="btn-import" for="import-excel-input">⬆ Import from Excel</label>
-                        <input type="file" id="import-excel-input" accept=".xlsx,.xls" style="display:none">
-                        <span class="import-hint">Column A: Name &nbsp;&middot;&nbsp; Column B: Division</span>
-                    </div>
+                    <h2>Competitors</h2>
                     <div id="competitors-list">
                         <!-- Competitors will be populated here -->
                     </div>

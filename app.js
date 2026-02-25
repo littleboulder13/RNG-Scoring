@@ -186,11 +186,17 @@ document.addEventListener('DOMContentLoaded', () => {
         selectEvent(event.id);
     });
 
-    // --- Event overlay: Select / Delete (delegated) ---
+    // --- Event overlay: Select / Edit / Delete (delegated) ---
     $('event-cards').addEventListener('click', (e) => {
         const selectBtn = e.target.closest('.btn-select-event');
         if (selectBtn) {
             selectEvent(selectBtn.dataset.id);
+            return;
+        }
+        const editBtn = e.target.closest('.btn-edit-event');
+        if (editBtn) {
+            if (hasAdminPin() && !promptAdminPin('edit this event')) return;
+            openEventEditor(editBtn.dataset.id);
             return;
         }
         const deleteBtn = e.target.closest('.btn-delete-event');
@@ -204,27 +210,49 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // --- Event Editor: close, done, add competitor, import ---
+    $('event-editor-close').addEventListener('click', () => {
+        saveEventEditorFields();
+        closeEventEditor();
+    });
+    $('event-editor-done').addEventListener('click', () => {
+        saveEventEditorFields();
+        const wasEditingId = editingEventId;
+        closeEventEditor();
+        // If this event is the active one, refresh the main UI
+        if (wasEditingId === getActiveEventId()) {
+            refreshAfterEventChange();
+        }
+    });
+    $('edit-add-competitor-btn').addEventListener('click', () => {
+        const name = $('edit-competitor-name').value.trim();
+        const div  = $('edit-competitor-division').value.trim();
+        if (!name || !editingEventId) return;
+        const ev = getEventById(editingEventId);
+        if (!ev) return;
+        if (ev.competitors.find(p => p.name === name)) return;
+        ev.competitors.push({ name, division: div });
+        ev.competitors.sort((a, b) => a.name.localeCompare(b.name));
+        updateEvent(editingEventId, { competitors: ev.competitors });
+        $('edit-competitor-name').value = '';
+        $('edit-competitor-division').value = '';
+        renderEditCompetitorsList();
+    });
+    $('edit-competitor-name').addEventListener('keypress', e => {
+        if (e.key === 'Enter') { e.preventDefault(); $('edit-add-competitor-btn').click(); }
+    });
+    $('edit-import-excel').addEventListener('change', async (e) => {
+        if (!e.target.files[0] || !editingEventId) return;
+        await importCompetitorsToEvent(e.target.files[0], editingEventId);
+        e.target.value = '';
+        renderEditCompetitorsList();
+    });
+
     // --- Header: Switch Event button ---
     $('change-event-btn').addEventListener('click', showEventOverlay);
 
     // --- Set default date on create form ---
     $('new-event-date').valueAsDate = new Date();
-
-    // --- Competitors tab ---
-    $('add-competitor-btn').addEventListener('click', () => {
-        const name = $('competitor-name-input').value.trim();
-        const div  = $('competitor-division-input').value.trim();
-        if (!name) return;
-        addPlayer(name, div);
-        $('competitor-name-input').value = '';
-        $('competitor-division-input').value = '';
-    });
-    $('competitor-name-input').addEventListener('keypress', e => {
-        if (e.key === 'Enter') { e.preventDefault(); $('add-competitor-btn').click(); }
-    });
-    $('import-excel-input').addEventListener('change', e => {
-        if (e.target.files[0]) { importFromExcel(e.target.files[0]); e.target.value = ''; }
-    });
 
     // --- Stages tab ---
     $('add-stage-mgmt-btn').addEventListener('click', () => {

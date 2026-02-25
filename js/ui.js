@@ -2,14 +2,14 @@
    UI — Render Lists, Dropdowns, Display Helpers
    ============================================================= */
 
-// --- Competitors List ---
+// --- Competitors List (read-only view in Competitors tab) ---
 function renderCompetitorsList() {
     const el = $('competitors-list');
     if (!el) return;
     const players = getPlayers();
 
     if (!players.length) {
-        el.innerHTML = '<div class="empty-state">No competitors yet. Add names above to get started.</div>';
+        el.innerHTML = '<div class="empty-state">No competitors in this event. Edit the event to add competitors.</div>';
         return;
     }
 
@@ -20,14 +20,9 @@ function renderCompetitorsList() {
                     <span class="competitor-name">${p.name}</span>
                     ${p.division ? `<span class="competitor-division-tag">${p.division}</span>` : ''}
                 </div>
-                <button class="btn-delete" data-name="${p.name}">Remove</button>
             </div>
         </div>
     `).join('');
-
-    el.querySelectorAll('.btn-delete').forEach(btn =>
-        btn.addEventListener('click', () => removePlayer(btn.dataset.name))
-    );
 }
 
 // --- Player Dropdown ---

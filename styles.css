@@ -796,6 +796,59 @@ button {
     margin-top: 0.25rem;
 }
 
+/* Event Editor */
+.event-editor {
+    background: white;
+    border-radius: 10px;
+    padding: 1.25rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    margin-top: 1rem;
+}
+
+.event-editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.event-editor-header h3 {
+    font-size: 1.1rem;
+    margin: 0;
+}
+
+.event-editor h4 {
+    font-size: 0.95rem;
+    margin-bottom: 0.75rem;
+    color: var(--text-color);
+}
+
+.editor-divider {
+    border: none;
+    border-top: 1px solid #eee;
+    margin: 1rem 0;
+}
+
+.edit-competitors-list {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-top: 0.5rem;
+}
+
+.btn-edit-event {
+    background: #f0f0f0;
+    color: #333;
+    border: 1px solid #ccc;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.btn-edit-event:hover {
+    background: #e0e0e0;
+}
+
 /* Active event bar in header */
 .header-info {
     flex: 1;

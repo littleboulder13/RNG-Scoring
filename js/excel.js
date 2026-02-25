@@ -40,6 +40,37 @@ async function importFromExcel(file) {
     alert(`Successfully imported ${imported} competitor(s).`);
 }
 
+// --- Import Competitors directly into a specific event ---
+async function importCompetitorsToEvent(file, eventId) {
+    const ev = getEventById(eventId);
+    if (!ev) return;
+    const data = await file.arrayBuffer();
+    const wb   = XLSX.read(data);
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+
+    const competitors = ev.competitors || [];
+    const headerNames = new Set(['name', 'shooter', 'competitor']);
+    let imported = 0;
+
+    for (const row of rows) {
+        const name     = String(row[0] || '').trim();
+        const division = String(row[1] || '').trim();
+        if (!name || headerNames.has(name.toLowerCase())) continue;
+        if (competitors.find(p => p.name === name)) continue;
+        competitors.push({ name, division });
+        imported++;
+    }
+
+    if (!imported) {
+        alert('No new competitors found to import.\n\nMake sure:\n• Column A = Name\n• Column B = Division\n• First sheet is the competitor list');
+        return;
+    }
+
+    competitors.sort((a, b) => a.name.localeCompare(b.name));
+    updateEvent(eventId, { competitors });
+    alert(`Successfully imported ${imported} competitor(s).`);
+}
+
 // --- Export Scores to Excel ---
 async function exportToExcel() {
     const allScores = await getEventScores();
