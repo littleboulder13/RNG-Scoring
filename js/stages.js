@@ -1,17 +1,19 @@
 /* =============================================================
-   Local Storage — Stage Management
+   Stage Management (Event-scoped)
+   
+   Reads and writes to the active event's stages array.
    ============================================================= */
+
 function getStages() {
-    const raw = localStorage.getItem('rng_stages');
-    if (!raw) return [];
-    // Migrate old plain-string format → { name, targets, par }
-    return JSON.parse(raw).map(s =>
+    const event = getActiveEvent();
+    if (!event) return [];
+    return (event.stages || []).map(s =>
         typeof s === 'string' ? { name: s, targets: '', par: '' } : s
     );
 }
 
 function saveStages(list) {
-    localStorage.setItem('rng_stages', JSON.stringify(list));
+    updateActiveEvent({ stages: list });
 }
 
 function addStage(name, targets = '', par = '') {

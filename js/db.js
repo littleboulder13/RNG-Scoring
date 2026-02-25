@@ -58,3 +58,19 @@ function markAsSynced(id) {
         req.onerror = () => reject(req.error);
     });
 }
+
+async function migrateScoresToEvent(eventId) {
+    const scores = await getAllScores();
+    const toMigrate = scores.filter(s => !s.eventId);
+    if (!toMigrate.length) return;
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        for (const score of toMigrate) {
+            score.eventId = eventId;
+            store.put(score);
+        }
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}

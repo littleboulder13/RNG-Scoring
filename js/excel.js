@@ -42,7 +42,7 @@ async function importFromExcel(file) {
 
 // --- Export Scores to Excel ---
 async function exportToExcel() {
-    const allScores = await getAllScores();
+    const allScores = await getEventScores();
     const players   = getPlayers();
     const stages    = getStages();
 
@@ -109,5 +109,7 @@ async function exportToExcel() {
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([dupeHeaders, ...dupeRows]), 'Duplicates');
     }
 
-    XLSX.writeFile(wb, `rng-scores-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    const event = getActiveEvent();
+    const eventSlug = event ? event.name.replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '-') : 'rng';
+    XLSX.writeFile(wb, `${eventSlug}-scores-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }

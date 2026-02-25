@@ -17,9 +17,36 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <!-- Event selection overlay -->
+    <div id="event-overlay" class="event-overlay" style="display:none">
+        <div class="event-overlay-inner">
+            <div class="event-overlay-header">
+                <img src="icon-192.png" alt="RNG" class="event-logo">
+                <h1>RNG Scoring</h1>
+                <p>Select an event to continue</p>
+            </div>
+            <div id="event-cards" class="event-cards">
+                <!-- Event cards rendered dynamically -->
+            </div>
+            <div class="event-create-section">
+                <h3>Create New Event</h3>
+                <input type="text" id="new-event-name" placeholder="Event name...">
+                <input type="date" id="new-event-date">
+                <input type="text" id="new-event-pin" placeholder="Admin PIN (optional)" inputmode="numeric">
+                <button id="create-event-btn" class="btn-primary">Create Event</button>
+            </div>
+        </div>
+    </div>
+
     <div id="app">
         <header>
-            <h1>RNG Scoring App</h1>
+            <div class="header-info">
+                <h1>RNG Scoring App</h1>
+                <div id="active-event-bar" class="active-event-bar" style="display:none">
+                    📋 <span id="active-event-name"></span>
+                    <button id="change-event-btn" class="btn-change-event">Switch</button>
+                </div>
+            </div>
             <div class="status">
                 <span id="online-status" class="status-indicator online">●</span>
                 <span id="status-text">Online</span>
@@ -144,6 +171,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="js/db.js"></script>
+    <script src="js/events.js"></script>
     <script src="js/players.js"></script>
     <script src="js/stages.js"></script>
     <script src="js/ui.js"></script>

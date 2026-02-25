@@ -3,16 +3,20 @@
    
    Load order (set in index.html):
      1. js/db.js       — IndexedDB operations & dbReady promise
-     2. js/players.js  — Player/competitor CRUD (localStorage)
-     3. js/stages.js   — Stage CRUD (localStorage)
-     4. js/ui.js       — DOM rendering, dropdowns, display helpers
-     5. js/excel.js    — Import/export with SheetJS
-     6. js/sync.js     — Network sync
-     7. app.js         — This file: init, service worker, events
+     2. js/events.js   — Event CRUD, active event, migration
+     3. js/players.js  — Player/competitor CRUD (event-scoped)
+     4. js/stages.js   — Stage CRUD (event-scoped)
+     5. js/ui.js       — DOM rendering, dropdowns, display helpers
+     6. js/excel.js    — Import/export with SheetJS
+     7. js/sync.js     — Network sync
+     8. app.js         — This file: init, service worker, events
    ============================================================= */
 
 // DOM shorthand used by all modules
 const $ = (id) => document.getElementById(id);
+
+// Admin session state — reset when switching events
+let adminAuthenticated = false;
 
 /* =============================================================
    Install Prompt (PWA "Add to Home Screen")
@@ -20,7 +24,7 @@ const $ = (id) => document.getElementById(id);
 let deferredInstallPrompt = null;
 
 window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();                       // Stop the default mini-infobar
+    e.preventDefault();
     deferredInstallPrompt = e;
     const banner = $('install-banner');
     if (banner && !sessionStorage.getItem('install-dismissed')) {
@@ -42,11 +46,24 @@ async function init() {
     try {
         await initDB();
         resolveDbReady();
-        await updateUI();
+
+        // Migrate legacy data (pre-events) into a default event
+        const migratedEventId = migrateToEvents();
+        if (migratedEventId) {
+            await migrateScoresToEvent(migratedEventId);
+        }
+
+        // Show overlay or refresh based on active event
+        if (getActiveEvent()) {
+            await refreshAfterEventChange();
+        } else {
+            showEventOverlay();
+        }
     } catch (err) {
         console.error('App init error:', err);
         alert('Error initialising database: ' + err.message);
     }
+
     updateOnlineStatus();
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
@@ -65,17 +82,65 @@ if ('serviceWorker' in navigator) {
 }
 
 /* =============================================================
+   Event Overlay — Select / Create / Delete Events
+   ============================================================= */
+function showEventOverlay() {
+    renderEventOverlay();
+    $('event-overlay').style.display = 'flex';
+    $('active-event-bar').style.display = 'none';
+}
+
+function hideEventOverlay() {
+    $('event-overlay').style.display = 'none';
+}
+
+function selectEvent(id) {
+    setActiveEvent(id);
+    adminAuthenticated = false;
+    hideEventOverlay();
+    refreshAfterEventChange();
+}
+
+async function refreshAfterEventChange() {
+    const event = getActiveEvent();
+    if (!event) return;
+    updateActiveEventBar();
+    populatePlayerDropdown();
+    renderCompetitorsList();
+    populateStageDropdown();
+    renderStagesList();
+    showStageInfo();
+    showShooterDivision();
+    try { await updateUI(); } catch (e) { /* DB may not be ready yet */ }
+}
+
+/* =============================================================
    UI Event Listeners — registered on page load, independent of DB
    ============================================================= */
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- Tab switching ---
+    // --- Tab switching (with admin PIN gate) ---
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
+            const tab = btn.dataset.tab;
+
+            // PIN-protect Competitors & Stages tabs
+            if ((tab === 'competitors' || tab === 'stages') && !adminAuthenticated) {
+                const event = getActiveEvent();
+                if (event && event.pin) {
+                    const entered = prompt('Enter admin PIN to access this section:');
+                    if (entered !== event.pin) {
+                        if (entered !== null) alert('Incorrect PIN.');
+                        return;
+                    }
+                    adminAuthenticated = true;
+                }
+            }
+
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             btn.classList.add('active');
-            $('tab-' + btn.dataset.tab).classList.add('active');
+            $('tab-' + tab).classList.add('active');
         });
     });
 
@@ -93,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sessionStorage.setItem('install-dismissed', '1');
     });
 
-    // Show iOS-specific hint (Safari doesn't fire beforeinstallprompt)
+    // Show iOS-specific hint
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches
                       || navigator.standalone === true;
@@ -104,6 +169,46 @@ document.addEventListener('DOMContentLoaded', () => {
         $('install-btn').style.display = 'none';
         banner.style.display = 'flex';
     }
+
+    // --- Event overlay: Create event ---
+    $('create-event-btn').addEventListener('click', () => {
+        const name = $('new-event-name').value.trim();
+        if (!name) { alert('Please enter an event name.'); return; }
+        const date = $('new-event-date').value;
+        const pin  = $('new-event-pin').value.trim();
+        const event = createEvent(name, date, pin);
+        $('new-event-name').value = '';
+        $('new-event-date').value = '';
+        $('new-event-pin').value  = '';
+        selectEvent(event.id);
+    });
+
+    // --- Event overlay: Select / Delete (delegated) ---
+    $('event-cards').addEventListener('click', (e) => {
+        const selectBtn = e.target.closest('.btn-select-event');
+        if (selectBtn) {
+            selectEvent(selectBtn.dataset.id);
+            return;
+        }
+        const deleteBtn = e.target.closest('.btn-delete-event');
+        if (deleteBtn) {
+            const ev = getEvents().find(ev => ev.id === deleteBtn.dataset.id);
+            if (!ev) return;
+            if (ev.pin) {
+                const pin = prompt('Enter admin PIN to delete this event:');
+                if (pin !== ev.pin) { if (pin !== null) alert('Incorrect PIN.'); return; }
+            }
+            if (!confirm(`Delete "${ev.name}"?\n\nThis removes the event and its stages/competitors. Scores in the database are kept.`)) return;
+            deleteEvent(ev.id);
+            renderEventOverlay();
+        }
+    });
+
+    // --- Header: Switch Event button ---
+    $('change-event-btn').addEventListener('click', showEventOverlay);
+
+    // --- Set default date on create form ---
+    $('new-event-date').valueAsDate = new Date();
 
     // --- Competitors tab ---
     $('add-competitor-btn').addEventListener('click', () => {
@@ -138,17 +243,20 @@ document.addEventListener('DOMContentLoaded', () => {
     $('stage').addEventListener('change', showStageInfo);
     $('player-name').addEventListener('change', showShooterDivision);
     $('dnf').addEventListener('change', toggleDNFFields);
-    toggleDNFFields();  // Set initial visibility
+    toggleDNFFields();
 
     // --- Scores tab ---
     $('sync-btn').addEventListener('click', syncScores);
     $('export-excel-btn').addEventListener('click', exportToExcel);
 
-    // --- Populate lists from localStorage ---
-    populatePlayerDropdown();
-    renderCompetitorsList();
-    populateStageDropdown();
-    renderStagesList();
+    // --- Populate UI for active event (immediate, from localStorage) ---
+    if (getActiveEvent()) {
+        populatePlayerDropdown();
+        renderCompetitorsList();
+        populateStageDropdown();
+        renderStagesList();
+        updateActiveEventBar();
+    }
 
     // --- Score form submission ---
     $('score-form').addEventListener('submit', async e => {
@@ -168,9 +276,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const playerName = $('player-name').value;
 
-        // Check for existing score for this shooter + stage
+        // Duplicate check (event-scoped)
         await dbReady;
-        const existing = await getAllScores();
+        const existing = await getEventScores();
         const isDuplicate = existing.some(s => s.playerName === playerName && s.stage === stageName);
         if (isDuplicate) {
             const confirmed = confirm(
@@ -180,6 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const score = {
+            eventId:               getActiveEventId(),
             stage:                 stageName,
             playerName,
             division:              getPlayerDivision($('player-name').value),

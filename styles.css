@@ -635,3 +635,175 @@ button {
 .btn-install-dismiss:hover {
     color: white;
 }
+
+/* Event selection overlay */
+.event-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: linear-gradient(135deg, #e3f2fd 0%, #f5f5f5 100%);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    overflow-y: auto;
+    padding: 1rem;
+    -webkit-overflow-scrolling: touch;
+}
+
+.event-overlay-inner {
+    width: 100%;
+    max-width: 500px;
+    padding: 1rem 0;
+}
+
+.event-overlay-header {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.event-logo {
+    width: 72px;
+    height: 72px;
+    border-radius: 16px;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+}
+
+.event-overlay-header h1 {
+    font-size: 1.75rem;
+    color: var(--primary-color);
+    margin-bottom: 0.25rem;
+}
+
+.event-overlay-header p {
+    color: #666;
+    font-size: 0.95rem;
+}
+
+/* Event cards */
+.event-cards {
+    margin-bottom: 1.5rem;
+}
+
+.event-card {
+    background: white;
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    transition: box-shadow 0.2s;
+}
+
+.event-card:hover {
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+}
+
+.event-card-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.event-card-info h3 {
+    font-size: 1.05rem;
+    margin-bottom: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.event-card-meta {
+    font-size: 0.8rem;
+    color: #888;
+}
+
+.event-card-actions {
+    display: flex;
+    gap: 0.4rem;
+    flex-shrink: 0;
+}
+
+.btn-select-event {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.btn-select-event:hover {
+    background: #1976D2;
+}
+
+.btn-delete-event {
+    background: transparent;
+    color: #999;
+    border: 1px solid #ddd;
+    padding: 0.5rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.btn-delete-event:hover {
+    color: var(--error-color);
+    border-color: var(--error-color);
+}
+
+/* Create event form */
+.event-create-section {
+    background: white;
+    border-radius: 10px;
+    padding: 1.25rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.event-create-section h3 {
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+    color: var(--text-color);
+}
+
+.event-create-section input {
+    margin-bottom: 0.5rem;
+}
+
+.event-create-section .btn-primary {
+    margin-top: 0.25rem;
+}
+
+/* Active event bar in header */
+.header-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.active-event-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.82rem;
+    opacity: 0.9;
+    margin-top: 0.2rem;
+}
+
+.btn-change-event {
+    background: rgba(255,255,255,0.2);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.4);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.btn-change-event:hover {
+    background: rgba(255,255,255,0.3);
+}

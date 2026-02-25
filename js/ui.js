@@ -172,7 +172,7 @@ function toggleDNFFields() {
 
 // --- Scores Display ---
 async function updateUI() {
-    const scores  = await getAllScores();
+    const scores  = await getEventScores();
     const pending = scores.filter(s => !s.synced);
 
     $('pending-count').textContent = pending.length;
@@ -222,4 +222,47 @@ function updateOnlineStatus() {
     $('online-status').classList.toggle('online', online);
     $('online-status').classList.toggle('offline', !online);
     $('status-text').textContent = online ? 'Online' : 'Offline';
+}
+
+// --- Event Overlay ---
+function renderEventOverlay() {
+    const cardsEl = $('event-cards');
+    if (!cardsEl) return;
+    const events = getEvents();
+
+    if (!events.length) {
+        cardsEl.innerHTML = '<div class="empty-state">No events yet. Create your first event below.</div>';
+        return;
+    }
+
+    cardsEl.innerHTML = events.map(e => `
+        <div class="event-card">
+            <div class="event-card-info">
+                <h3>${e.name}</h3>
+                <div class="event-card-meta">
+                    \uD83D\uDCC5 ${e.date || 'No date set'}
+                    &nbsp;·&nbsp; \uD83C\uDFAF ${e.stages.length} stage${e.stages.length !== 1 ? 's' : ''}
+                    &nbsp;·&nbsp; \uD83D\uDC65 ${e.competitors.length} shooter${e.competitors.length !== 1 ? 's' : ''}
+                    ${e.pin ? ' &nbsp;·&nbsp; \uD83D\uDD12' : ''}
+                </div>
+            </div>
+            <div class="event-card-actions">
+                <button class="btn-select-event" data-id="${e.id}">Select</button>
+                <button class="btn-delete-event" data-id="${e.id}">\u2715</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// --- Active Event Header Bar ---
+function updateActiveEventBar() {
+    const event = getActiveEvent();
+    const bar = $('active-event-bar');
+    if (!bar) return;
+    if (event) {
+        $('active-event-name').textContent = event.name;
+        bar.style.display = '';
+    } else {
+        bar.style.display = 'none';
+    }
 }
