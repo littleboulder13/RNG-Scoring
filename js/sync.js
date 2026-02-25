@@ -96,7 +96,7 @@ function promptSyncUrl() {
 async function autoSyncUrl() {
     if (!navigator.onLine) return;
     try {
-        const data = await _getFromAppsScript('action=pullConfig');
+        const data = await _postToAppsScript({ action: 'pullConfig' });
         if (data && data.syncUrl && data.syncUrl.startsWith('https://script.google.com/')) {
             const current = getSyncUrl();
             if (data.syncUrl !== current) {
@@ -209,7 +209,7 @@ async function pullEvents() {
     if (pullBtn) { pullBtn.disabled = true; pullBtn.textContent = 'Pulling\u2026'; }
 
     try {
-        const data = await _getFromAppsScript('action=pullEvents');
+        const data = await _postToAppsScript({ action: 'pullEvents' });
 
         if (!data.events || !data.events.length) {
             alert('No events found in the cloud yet.');

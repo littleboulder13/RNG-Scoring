@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rng-scoring-v56';
+const CACHE_NAME = 'rng-scoring-v57';
 const urlsToCache = [
     './',
     './index.html',

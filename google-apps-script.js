@@ -25,6 +25,14 @@ function doPost(e) {
       return _pushConfig(ss, data.config);
     }
 
+    if (action === 'pullEvents') {
+      return _pullEvents();
+    }
+
+    if (action === 'pullConfig') {
+      return _pullConfig();
+    }
+
     // Default: syncScores
     return _syncScores(ss, data);
 
