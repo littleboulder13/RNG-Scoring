@@ -15,6 +15,27 @@
 const $ = (id) => document.getElementById(id);
 
 /* =============================================================
+   Install Prompt (PWA "Add to Home Screen")
+   ============================================================= */
+let deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();                       // Stop the default mini-infobar
+    deferredInstallPrompt = e;
+    const banner = $('install-banner');
+    if (banner && !sessionStorage.getItem('install-dismissed')) {
+        banner.style.display = 'flex';
+    }
+});
+
+window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    const banner = $('install-banner');
+    if (banner) banner.style.display = 'none';
+    console.log('App installed successfully');
+});
+
+/* =============================================================
    App Initialization
    ============================================================= */
 async function init() {
@@ -57,6 +78,32 @@ document.addEventListener('DOMContentLoaded', () => {
             $('tab-' + btn.dataset.tab).classList.add('active');
         });
     });
+
+    // --- Install banner buttons ---
+    $('install-btn').addEventListener('click', async () => {
+        if (!deferredInstallPrompt) return;
+        deferredInstallPrompt.prompt();
+        const { outcome } = await deferredInstallPrompt.userChoice;
+        console.log('Install prompt outcome:', outcome);
+        deferredInstallPrompt = null;
+        $('install-banner').style.display = 'none';
+    });
+    $('install-dismiss').addEventListener('click', () => {
+        $('install-banner').style.display = 'none';
+        sessionStorage.setItem('install-dismissed', '1');
+    });
+
+    // Show iOS-specific hint (Safari doesn't fire beforeinstallprompt)
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+                      || navigator.standalone === true;
+    if (isIOS && !isStandalone) {
+        const banner = $('install-banner');
+        $('install-message').innerHTML =
+            '📲 To install: tap <strong>Share</strong> ⎋ then <strong>"Add to Home Screen"</strong>';
+        $('install-btn').style.display = 'none';
+        banner.style.display = 'flex';
+    }
 
     // --- Competitors tab ---
     $('add-competitor-btn').addEventListener('click', () => {

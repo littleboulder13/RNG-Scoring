@@ -583,3 +583,55 @@ button {
 .btn-export:hover {
     background: #3949ab;
 }
+
+/* Install banner */
+.install-banner {
+    background: linear-gradient(135deg, #1565C0, #1976D2);
+    color: white;
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from { transform: translateY(-100%); opacity: 0; }
+    to   { transform: translateY(0);     opacity: 1; }
+}
+
+.install-banner span {
+    flex: 1;
+    font-size: 0.9rem;
+}
+
+.btn-install {
+    background: white;
+    color: #1565C0;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.btn-install:hover {
+    background: #e3f2fd;
+}
+
+.btn-install-dismiss {
+    background: transparent;
+    color: rgba(255,255,255,0.8);
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0.25rem;
+    line-height: 1;
+}
+
+.btn-install-dismiss:hover {
+    color: white;
+}

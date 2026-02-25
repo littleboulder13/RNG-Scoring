@@ -5,10 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#2196F3">
     <meta name="description" content="RNG Scoring App - Track scores offline and sync online">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="RNG Scores">
     <title>RNG Scoring App</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -20,6 +25,12 @@
                 <span id="status-text">Online</span>
             </div>
         </header>
+
+        <div id="install-banner" class="install-banner" style="display:none">
+            <span id="install-message">📲 Install this app on your device for quick access!</span>
+            <button id="install-btn" class="btn-install">Install</button>
+            <button id="install-dismiss" class="btn-install-dismiss" aria-label="Dismiss">✕</button>
+        </div>
 
         <main>
             <nav class="tab-bar">
