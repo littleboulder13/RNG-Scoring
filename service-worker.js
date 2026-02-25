@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rng-scoring-v30';
+const CACHE_NAME = 'rng-scoring-v31';
 const urlsToCache = [
     '/',
     '/index.html',
@@ -12,6 +12,7 @@ const urlsToCache = [
     '/js/excel.js',
     '/js/sync.js',
     '/manifest.json',
+    '/logo.png',
     '/icon-192.png',
     '/icon-512.png'
 ];

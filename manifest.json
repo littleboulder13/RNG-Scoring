@@ -1,7 +1,7 @@
 {
-  "name": "RNG Scoring App",
-  "short_name": "RNG Scores",
-  "description": "Track scores offline and sync online",
+  "name": "Stilly Run 'N Gun",
+  "short_name": "Stilly RNG",
+  "description": "Stilly Run 'N Gun - Scoring App",
   "id": "/",
   "start_url": "/",
   "scope": "/",
