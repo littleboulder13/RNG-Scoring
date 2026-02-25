@@ -1,20 +1,20 @@
-const CACHE_NAME = 'rng-scoring-v43';
+const CACHE_NAME = 'rng-scoring-v44';
 const urlsToCache = [
-    '/',
-    '/index.html',
-    '/styles.css',
-    '/app.js',
-    '/js/db.js',
-    '/js/events.js',
-    '/js/players.js',
-    '/js/stages.js',
-    '/js/ui.js',
-    '/js/excel.js',
-    '/js/sync.js',
-    '/manifest.json',
-    '/logo.png',
-    '/icon-192.png',
-    '/icon-512.png'
+    './',
+    './index.html',
+    './styles.css',
+    './app.js',
+    './js/db.js',
+    './js/events.js',
+    './js/players.js',
+    './js/stages.js',
+    './js/ui.js',
+    './js/excel.js',
+    './js/sync.js',
+    './manifest.json',
+    './logo.png',
+    './icon-192.png',
+    './icon-512.png'
 ];
 
 // Install service worker and cache files
