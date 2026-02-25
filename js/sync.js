@@ -35,8 +35,20 @@ async function pullEvents() {
     if (pullBtn) { pullBtn.disabled = true; pullBtn.textContent = 'Pulling…'; }
 
     try {
-        const res = await fetch(SYNC_URL + '?action=pullEvents');
-        const data = await res.json();
+        // Cache-bust to prevent stale responses
+        const res = await fetch(SYNC_URL + '?action=pullEvents&_t=' + Date.now());
+        if (!res.ok) {
+            alert('Pull failed: server returned ' + res.status + ' ' + res.statusText);
+            return;
+        }
+        const text = await res.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (parseErr) {
+            alert('Pull failed: invalid response from cloud.\n\n' + text.substring(0, 200));
+            return;
+        }
 
         if (!data.events || !data.events.length) {
             alert('No events found in the cloud yet.');
@@ -54,7 +66,6 @@ async function pullEvents() {
             } else {
                 // Update stages and competitors from cloud
                 local[idx].name = remote.name;
-                local[idx].date = remote.date;
                 local[idx].stages = remote.stages;
                 local[idx].competitors = remote.competitors;
                 updated++;
@@ -70,7 +81,7 @@ async function pullEvents() {
         alert(`✓ Pulled events from cloud: ${parts.join(', ') || 'already up to date'}`);
     } catch (err) {
         console.error('Pull error:', err);
-        alert('Failed to pull events: ' + err.message);
+        alert('Failed to pull events: ' + err.message + '\n\nMake sure you have internet access and try again.');
     } finally {
         if (pullBtn) { pullBtn.disabled = false; pullBtn.textContent = '⬇ Pull Events from Cloud'; }
     }

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rng-scoring-v40';
+const CACHE_NAME = 'rng-scoring-v41';
 const urlsToCache = [
     '/',
     '/index.html',
@@ -19,6 +19,7 @@ const urlsToCache = [
 
 // Install service worker and cache files
 self.addEventListener('install', (event) => {
+    self.skipWaiting();
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => cache.addAll(urlsToCache))
@@ -46,7 +47,7 @@ self.addEventListener('fetch', (event) => {
     );
 });
 
-// Update service worker
+// Update service worker — claim all clients immediately
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((cacheNames) => {
@@ -57,6 +58,6 @@ self.addEventListener('activate', (event) => {
                     }
                 })
             );
-        })
+        }).then(() => self.clients.claim())
     );
 });
