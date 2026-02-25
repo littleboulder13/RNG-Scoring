@@ -839,6 +839,55 @@ button {
     border-radius: 6px;
     font-size: 1rem;
 }
+
+/* --- Score Confirmation Modal --- */
+.confirm-details {
+    background: var(--bg-color);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.confirm-details .confirm-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid #e0e0e0;
+    font-size: 0.95rem;
+}
+
+.confirm-details .confirm-row:last-child {
+    border-bottom: none;
+}
+
+.confirm-details .confirm-label {
+    font-weight: 600;
+    color: #555;
+}
+
+.confirm-details .confirm-value {
+    text-align: right;
+    color: var(--text-color);
+    max-width: 60%;
+    word-break: break-word;
+}
+
+.confirm-details .confirm-value.dnf-flag {
+    color: var(--error-color);
+    font-weight: 700;
+}
+
+.confirm-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.confirm-actions button {
+    flex: 1;
+    padding: 0.75rem;
+    font-size: 1rem;
+    border-radius: 8px;
+}
 }
 
 .event-overlay-header {

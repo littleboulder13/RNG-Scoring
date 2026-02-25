@@ -296,6 +296,64 @@ document.addEventListener('DOMContentLoaded', () => {
         updateActiveEventBar();
     }
 
+    // --- Score confirmation modal ---
+    let pendingScore = null;
+
+    function showConfirmScoreModal(score) {
+        pendingScore = score;
+        const waitMin = Math.floor((score.waitTime || 0) / 60);
+        const waitSec = (score.waitTime || 0) % 60;
+        const waitStr = waitMin + ':' + String(waitSec).padStart(2, '0');
+
+        const rows = [
+            ['Stage', score.stage],
+            ['Shooter', score.playerName],
+            ['Division', score.division || '—'],
+            ['DNF', score.dnf ? 'Yes' : 'No', score.dnf],
+            ['Time (s)', score.dnf ? 'N/A' : score.time],
+            ['Wait Time', waitStr],
+            ['Targets Not Neutralized', score.targetsNotNeutralized || 0],
+            ['Notes', score.notes || '—']
+        ];
+
+        const html = rows.map(r => {
+            const valClass = r[2] ? 'confirm-value dnf-flag' : 'confirm-value';
+            return `<div class="confirm-row"><span class="confirm-label">${r[0]}</span><span class="${valClass}">${r[1]}</span></div>`;
+        }).join('');
+
+        $('confirm-score-details').innerHTML = html;
+        $('confirm-score-modal').style.display = 'flex';
+    }
+
+    function closeConfirmScoreModal() {
+        $('confirm-score-modal').style.display = 'none';
+        pendingScore = null;
+    }
+
+    $('confirm-score-close').addEventListener('click', closeConfirmScoreModal);
+    $('confirm-score-cancel').addEventListener('click', closeConfirmScoreModal);
+    $('confirm-score-submit').addEventListener('click', async () => {
+        if (!pendingScore) return;
+        const score = pendingScore;
+        closeConfirmScoreModal();
+
+        try {
+            await dbReady;
+            await saveScore(score);
+            const savedStage  = $('stage').value;
+            const savedPlayer = $('player-name').value;
+            $('score-form').reset();
+            $('stage').value       = savedStage;
+            $('player-name').value = savedPlayer;
+            showShooterDivision();
+            toggleDNFFields();
+            await updateUI();
+        } catch (err) {
+            console.error('Save error:', err);
+            alert('Error saving score: ' + err.message);
+        }
+    });
+
     // --- Score form submission ---
     $('score-form').addEventListener('submit', async e => {
         e.preventDefault();
@@ -338,22 +396,7 @@ document.addEventListener('DOMContentLoaded', () => {
             notes:                 $('notes').value
         };
 
-        try {
-            await dbReady;
-            await saveScore(score);
-            const savedStage  = $('stage').value;
-            const savedPlayer = $('player-name').value;
-            e.target.reset();
-            $('stage').value       = savedStage;
-            $('player-name').value = savedPlayer;
-            showShooterDivision();
-            toggleDNFFields();
-            await updateUI();
-            alert('Score saved!');
-        } catch (err) {
-            console.error('Save error:', err);
-            alert('Error saving score: ' + err.message);
-        }
+        showConfirmScoreModal(score);
     });
 });
 
