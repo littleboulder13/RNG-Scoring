@@ -1,7 +1,7 @@
 /* =============================================================
    Event Management (localStorage)
    
-   Each event: { id, name, date, pin, stages[], competitors[] }
+   Each event: { id, name, pin, stages[], competitors[] }
    Stages and competitors are stored per-event, not globally.
    ============================================================= */
 
@@ -38,12 +38,11 @@ function saveEvents(list) {
     localStorage.setItem('rng_events', JSON.stringify(list));
 }
 
-function createEvent(name, date) {
+function createEvent(name) {
     const events = getEvents();
     const event = {
         id:          Date.now().toString(36) + Math.random().toString(36).substr(2, 6),
         name,
-        date:        date || new Date().toISOString().slice(0, 10),
         stages:      [],
         competitors: []
     };
@@ -123,7 +122,7 @@ function migrateToEvents() {
         typeof s === 'string' ? { name: s, targets: '', par: '' } : s
     );
 
-    const event = createEvent('Default Event', new Date().toISOString().slice(0, 10));
+    const event = createEvent('Default Event');
     const events = getEvents();
     const idx = events.findIndex(e => e.id === event.id);
     events[idx].competitors = competitors;

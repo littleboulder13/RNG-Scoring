@@ -133,8 +133,7 @@ function renderEventOverlay() {
             <div class="event-card-info">
                 <h3>${e.name}</h3>
                 <div class="event-card-meta">
-                    \uD83D\uDCC5 ${e.date || 'No date set'}
-                    &nbsp;·&nbsp; \uD83C\uDFAF ${e.stages.length} stage${e.stages.length !== 1 ? 's' : ''}
+                    \uD83C\uDFAF ${e.stages.length} stage${e.stages.length !== 1 ? 's' : ''}
                     &nbsp;·&nbsp; \uD83D\uDC65 ${e.competitors.length} shooter${e.competitors.length !== 1 ? 's' : ''}
                 </div>
             </div>
@@ -173,7 +172,6 @@ function openEventEditor(eventId) {
     // Populate fields
     $('event-editor-title').textContent = `Edit: ${ev.name}`;
     $('edit-event-name').value = ev.name;
-    $('edit-event-date').value = ev.date || '';
     renderEditCompetitorsList();
     renderEditStagesList();
 
@@ -196,9 +194,8 @@ function closeEventEditor() {
 function saveEventEditorFields() {
     if (!editingEventId) return;
     const name = $('edit-event-name').value.trim();
-    const date = $('edit-event-date').value;
     if (!name) return;
-    updateEvent(editingEventId, { name, date });
+    updateEvent(editingEventId, { name });
 }
 
 function renderEditCompetitorsList() {

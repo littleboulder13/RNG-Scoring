@@ -168,11 +168,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const name = $('new-event-name').value.trim();
         if (!name) { alert('Please enter an event name.'); return; }
-        const date = $('new-event-date').value;
-        const event = createEvent(name, date);
+        const event = createEvent(name);
         pushEventConfig(event.id);  // sync to cloud
         $('new-event-name').value = '';
-        $('new-event-date').value = '';
         selectEvent(event.id);
     });
 
@@ -242,9 +240,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Header: Switch Event button ---
     $('change-event-btn').addEventListener('click', showEventOverlay);
-
-    // --- Set default date on create form ---
-    $('new-event-date').valueAsDate = new Date();
 
     // --- Event Editor: add stage ---
     $('edit-add-stage-btn').addEventListener('click', () => {
