@@ -49,44 +49,42 @@ async function autoSyncUrl() {
     }
 }
 
-/* --- Helper: POST to Apps Script (handles redirects on iOS) --- */
-async function _postToAppsScript(payload) {
-    const url = getSyncUrl();
-    try {
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify(payload),
-            redirect: 'follow'
-        });
-        const text = await res.text();
-        try { return JSON.parse(text); } catch (_) { return { _raw: text }; }
-    } catch (err) {
-        // iOS PWA sometimes blocks redirected POST — try no-cors as fallback
-        console.warn('POST fetch failed, trying no-cors fallback:', err.message);
-        try {
-            await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify(payload),
-                mode: 'no-cors',
-                redirect: 'follow'
-            });
-            // no-cors gives opaque response — assume success
-            return { success: true, _fallback: true };
-        } catch (err2) {
-            throw err2;
-        }
-    }
+/* --- Helper: POST to Apps Script via XHR (reliable on iOS PWAs) --- */
+function _postToAppsScript(payload) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', getSyncUrl());
+        xhr.setRequestHeader('Content-Type', 'text/plain');
+        xhr.onload = function () {
+            try { resolve(JSON.parse(xhr.responseText)); }
+            catch (_) { resolve({ _raw: xhr.responseText }); }
+        };
+        xhr.onerror = function () { reject(new Error('Network request failed')); };
+        xhr.ontimeout = function () { reject(new Error('Request timed out')); };
+        xhr.timeout = 30000;
+        xhr.send(JSON.stringify(payload));
+    });
 }
 
-/* --- Helper: GET from Apps Script (handles redirects on iOS) --- */
-async function _getFromAppsScript(params) {
-    const url = getSyncUrl() + '?' + params + '&_t=' + Date.now();
-    const res = await fetch(url, { redirect: 'follow' });
-    if (!res.ok) throw new Error('Server returned ' + res.status);
-    const text = await res.text();
-    try { return JSON.parse(text); } catch (_) { throw new Error('Invalid response: ' + text.substring(0, 200)); }
+/* --- Helper: GET from Apps Script via XHR (reliable on iOS PWAs) --- */
+function _getFromAppsScript(params) {
+    return new Promise((resolve, reject) => {
+        const url = getSyncUrl() + '?' + params + '&_t=' + Date.now();
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', url);
+        xhr.onload = function () {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try { resolve(JSON.parse(xhr.responseText)); }
+                catch (_) { reject(new Error('Invalid response: ' + xhr.responseText.substring(0, 200))); }
+            } else {
+                reject(new Error('Server returned ' + xhr.status));
+            }
+        };
+        xhr.onerror = function () { reject(new Error('Network request failed')); };
+        xhr.ontimeout = function () { reject(new Error('Request timed out')); };
+        xhr.timeout = 30000;
+        xhr.send();
+    });
 }
 
 function updateSyncStatus() {
