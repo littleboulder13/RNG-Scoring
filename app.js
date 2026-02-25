@@ -119,20 +119,15 @@ async function refreshAfterEventChange() {
    ============================================================= */
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- Tab switching (with admin PIN gate) ---
+    // --- Tab switching (with admin PIN gate on Stages) ---
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const tab = btn.dataset.tab;
 
-            // PIN-protect Competitors & Stages tabs
-            if ((tab === 'competitors' || tab === 'stages') && !adminAuthenticated) {
-                const event = getActiveEvent();
-                if (event && event.pin) {
-                    const entered = prompt('Enter admin PIN to access this section:');
-                    if (entered !== event.pin) {
-                        if (entered !== null) alert('Incorrect PIN.');
-                        return;
-                    }
+            // PIN-protect Stages tab
+            if (tab === 'stages' && !adminAuthenticated) {
+                if (hasAdminPin()) {
+                    if (!promptAdminPin('access Stages')) return;
                     adminAuthenticated = true;
                 }
             }
@@ -170,16 +165,24 @@ document.addEventListener('DOMContentLoaded', () => {
         banner.style.display = 'flex';
     }
 
-    // --- Event overlay: Create event ---
+    // --- Event overlay: Create event (admin PIN required) ---
     $('create-event-btn').addEventListener('click', () => {
+        // Ensure admin PIN is set
+        if (!hasAdminPin()) {
+            const newPin = prompt('Set up your admin PIN.\n\nThis PIN will be required to create events and manage stages:');
+            if (!newPin || !newPin.trim()) { alert('Admin PIN is required.'); return; }
+            setAdminPin(newPin.trim());
+            alert('Admin PIN saved! Remember this PIN.');
+        } else {
+            if (!promptAdminPin('create an event')) return;
+        }
+
         const name = $('new-event-name').value.trim();
         if (!name) { alert('Please enter an event name.'); return; }
         const date = $('new-event-date').value;
-        const pin  = $('new-event-pin').value.trim();
-        const event = createEvent(name, date, pin);
+        const event = createEvent(name, date);
         $('new-event-name').value = '';
         $('new-event-date').value = '';
-        $('new-event-pin').value  = '';
         selectEvent(event.id);
     });
 
@@ -194,10 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (deleteBtn) {
             const ev = getEvents().find(ev => ev.id === deleteBtn.dataset.id);
             if (!ev) return;
-            if (ev.pin) {
-                const pin = prompt('Enter admin PIN to delete this event:');
-                if (pin !== ev.pin) { if (pin !== null) alert('Incorrect PIN.'); return; }
-            }
+            if (hasAdminPin() && !promptAdminPin('delete this event')) return;
             if (!confirm(`Delete "${ev.name}"?\n\nThis removes the event and its stages/competitors. Scores in the database are kept.`)) return;
             deleteEvent(ev.id);
             renderEventOverlay();

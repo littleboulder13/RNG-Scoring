@@ -5,6 +5,31 @@
    Stages and competitors are stored per-event, not globally.
    ============================================================= */
 
+/* --- Global Admin PIN --- */
+function getAdminPin() {
+    return localStorage.getItem('rng_admin_pin') || '';
+}
+
+function setAdminPin(pin) {
+    localStorage.setItem('rng_admin_pin', pin);
+}
+
+function hasAdminPin() {
+    return !!getAdminPin();
+}
+
+function verifyAdminPin(entered) {
+    return entered === getAdminPin();
+}
+
+function promptAdminPin(actionLabel) {
+    const entered = prompt(`Enter admin PIN to ${actionLabel}:`);
+    if (entered === null) return false;        // cancelled
+    if (verifyAdminPin(entered)) return true;   // correct
+    alert('Incorrect PIN.');
+    return false;
+}
+
 function getEvents() {
     return JSON.parse(localStorage.getItem('rng_events') || '[]');
 }
@@ -13,13 +38,12 @@ function saveEvents(list) {
     localStorage.setItem('rng_events', JSON.stringify(list));
 }
 
-function createEvent(name, date, pin) {
+function createEvent(name, date) {
     const events = getEvents();
     const event = {
         id:          Date.now().toString(36) + Math.random().toString(36).substr(2, 6),
         name,
         date:        date || new Date().toISOString().slice(0, 10),
-        pin:         pin || '',
         stages:      [],
         competitors: []
     };
@@ -87,7 +111,7 @@ function migrateToEvents() {
         typeof s === 'string' ? { name: s, targets: '', par: '' } : s
     );
 
-    const event = createEvent('Default Event', new Date().toISOString().slice(0, 10), '');
+    const event = createEvent('Default Event', new Date().toISOString().slice(0, 10));
     const events = getEvents();
     const idx = events.findIndex(e => e.id === event.id);
     events[idx].competitors = competitors;

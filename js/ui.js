@@ -243,7 +243,7 @@ function renderEventOverlay() {
                     \uD83D\uDCC5 ${e.date || 'No date set'}
                     &nbsp;·&nbsp; \uD83C\uDFAF ${e.stages.length} stage${e.stages.length !== 1 ? 's' : ''}
                     &nbsp;·&nbsp; \uD83D\uDC65 ${e.competitors.length} shooter${e.competitors.length !== 1 ? 's' : ''}
-                    ${e.pin ? ' &nbsp;·&nbsp; \uD83D\uDD12' : ''}
+
                 </div>
             </div>
             <div class="event-card-actions">
