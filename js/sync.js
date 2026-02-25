@@ -133,12 +133,8 @@ function _getFromAppsScript(params) {
         const xhr = new XMLHttpRequest();
         xhr.open('GET', url);
         xhr.onload = function () {
-            if (xhr.status >= 200 && xhr.status < 300) {
-                try { resolve(JSON.parse(xhr.responseText)); }
-                catch (_) { reject(new Error('Invalid response: ' + xhr.responseText.substring(0, 200))); }
-            } else {
-                reject(new Error('Server returned ' + xhr.status));
-            }
+            try { resolve(JSON.parse(xhr.responseText)); }
+            catch (_) { reject(new Error('Invalid response: ' + xhr.responseText.substring(0, 200))); }
         };
         xhr.onerror = function () { reject(new Error('Network request failed')); };
         xhr.ontimeout = function () { reject(new Error('Request timed out')); };
