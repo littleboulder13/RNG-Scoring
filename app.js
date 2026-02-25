@@ -68,8 +68,11 @@ async function init() {
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
     window.addEventListener('online', async () => {
-        if (SYNC_URL && (await getPendingScores()).length) setTimeout(syncScores, 1000);
+        if (getSyncUrl() && (await getPendingScores()).length) setTimeout(syncScores, 1000);
     });
+
+    // Auto-sync the Apps Script URL from the cloud
+    autoSyncUrl();
 }
 
 // Service Worker Registration

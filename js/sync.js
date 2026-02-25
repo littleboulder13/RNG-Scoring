@@ -25,7 +25,28 @@ function promptSyncUrl() {
         if (!confirm('This doesn\u2019t look like a Google Apps Script URL. Save anyway?')) return;
     }
     setSyncUrl(trimmed);
+    // Push the new URL to the cloud so other devices pick it up
+    _postToAppsScript({ action: 'pushConfig', config: { syncUrl: trimmed } })
+        .then(() => console.log('Sync URL pushed to cloud'))
+        .catch(err => console.warn('Failed to push sync URL to cloud:', err.message));
     alert('\u2713 Sync URL updated!');
+}
+
+/* --- Auto-sync URL on app load --- */
+async function autoSyncUrl() {
+    if (!navigator.onLine) return;
+    try {
+        const data = await _getFromAppsScript('action=pullConfig');
+        if (data && data.syncUrl && data.syncUrl.startsWith('https://script.google.com/')) {
+            const current = getSyncUrl();
+            if (data.syncUrl !== current) {
+                setSyncUrl(data.syncUrl);
+                console.log('Sync URL auto-updated from cloud:', data.syncUrl);
+            }
+        }
+    } catch (err) {
+        console.warn('Auto-sync URL check failed:', err.message);
+    }
 }
 
 /* --- Helper: POST to Apps Script (handles redirects on iOS) --- */

@@ -21,6 +21,10 @@ function doPost(e) {
       return _pushEvent(ss, data.event);
     }
 
+    if (action === 'pushConfig') {
+      return _pushConfig(ss, data.config);
+    }
+
     // Default: syncScores
     return _syncScores(ss, data);
 
@@ -34,6 +38,10 @@ function doGet(e) {
 
   if (action === 'pullEvents') {
     return _pullEvents();
+  }
+
+  if (action === 'pullConfig') {
+    return _pullConfig();
   }
 
   return _jsonResponse({ status: 'ok', message: 'Stilly RNG sync endpoint is running' });
@@ -185,4 +193,55 @@ function _jsonResponse(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+/* --- Config Storage (_Config sheet) --- */
+function _getConfigSheet(ss) {
+  var sheet = ss.getSheetByName('_Config');
+  if (!sheet) {
+    sheet = ss.insertSheet('_Config');
+    sheet.getRange(1, 1, 1, 2).setValues([['Key', 'Value']]);
+    sheet.getRange(1, 1, 1, 2)
+      .setFontWeight('bold')
+      .setBackground('#424242')
+      .setFontColor('#ffffff');
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function _getConfig(ss, key) {
+  var sheet = _getConfigSheet(ss);
+  if (sheet.getLastRow() < 2) return null;
+  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+  for (var i = 0; i < data.length; i++) {
+    if (data[i][0] === key) return data[i][1];
+  }
+  return null;
+}
+
+function _setConfig(ss, key, value) {
+  var sheet = _getConfigSheet(ss);
+  if (sheet.getLastRow() >= 2) {
+    var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+    for (var i = 0; i < data.length; i++) {
+      if (data[i][0] === key) {
+        sheet.getRange(i + 2, 2).setValue(value);
+        return;
+      }
+    }
+  }
+  sheet.getRange(sheet.getLastRow() + 1, 1, 1, 2).setValues([[key, value]]);
+}
+
+function _pushConfig(ss, config) {
+  if (!config) return _jsonResponse({ success: false, error: 'No config data' });
+  if (config.syncUrl) _setConfig(ss, 'syncUrl', config.syncUrl);
+  return _jsonResponse({ success: true });
+}
+
+function _pullConfig() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var syncUrl = _getConfig(ss, 'syncUrl');
+  return _jsonResponse({ syncUrl: syncUrl || '' });
 }
