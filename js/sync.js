@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v88';
+const APP_VERSION = 'v89';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxl5_JrmYOV_oOW0COYUlGa_XrEFNT57CHJyTOznHQbO_FivjN_KYv2zkgqbD3N4nwz/exec';
 
 function getSyncUrl() {
@@ -110,54 +110,42 @@ async function autoSyncUrl() {
     }
 }
 
-/* --- Helper: POST to Apps Script via fetch (handles iOS cross-origin redirects) --- */
+/* --- Helper: POST to Apps Script via XHR (reliable on iOS PWAs) --- */
 function _postToAppsScript(payload, queryString) {
-    const url = getSyncUrl() + (queryString || '');
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 30000);
-
-    return fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(payload),
-        redirect: 'follow',
-        signal: controller.signal
-    })
-    .then(r => { clearTimeout(timer); return r.text(); })
-    .then(text => {
-        try { return JSON.parse(text); }
-        catch (_) { return { _raw: text }; }
-    })
-    .catch(err => {
-        clearTimeout(timer);
-        throw new Error(err.name === 'AbortError' ? 'Request timed out' : 'Network request failed: ' + err.message);
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', getSyncUrl() + (queryString || ''));
+        xhr.setRequestHeader('Content-Type', 'text/plain');
+        xhr.onload = function () {
+            try { resolve(JSON.parse(xhr.responseText)); }
+            catch (_) { resolve({ _raw: xhr.responseText }); }
+        };
+        xhr.onerror = function () { reject(new Error('Network request failed')); };
+        xhr.ontimeout = function () { reject(new Error('Request timed out')); };
+        xhr.timeout = 30000;
+        xhr.send(JSON.stringify(payload));
     });
 }
 
-/* --- Helper: Pull data from Apps Script via fetch --- */
-/* Sends action in URL query string so it survives any POST→GET redirect.  */
-/* Also sends in body for doPost(e.parameter.action).                      */
+/* --- Helper: Pull data from Apps Script via XHR --- */
+/* Action sent in both URL query string (survives redirects) and POST body. */
 function _fetchFromAppsScript(action) {
-    const url = getSyncUrl() + '?action=' + encodeURIComponent(action);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 30000);
-
-    return fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'action=' + encodeURIComponent(action),
-        redirect: 'follow',
-        signal: controller.signal
-    })
-    .then(r => { clearTimeout(timer); return r.text(); })
-    .then(text => {
-        try { return JSON.parse(text); }
-        catch (_) { throw new Error('Invalid response: ' + text.substring(0, 200)); }
-    })
-    .catch(err => {
-        clearTimeout(timer);
-        if (err.message && err.message.startsWith('Invalid response')) throw err;
-        throw new Error(err.name === 'AbortError' ? 'Request timed out' : 'Network request failed: ' + err.message);
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        const url = getSyncUrl() + '?action=' + encodeURIComponent(action);
+        xhr.open('POST', url);
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        xhr.onload = function () {
+            try {
+                resolve(JSON.parse(xhr.responseText));
+            } catch (_) {
+                reject(new Error('Invalid response: ' + xhr.responseText.substring(0, 200)));
+            }
+        };
+        xhr.onerror = function () { reject(new Error('Network request failed')); };
+        xhr.ontimeout = function () { reject(new Error('Request timed out')); };
+        xhr.timeout = 30000;
+        xhr.send('action=' + encodeURIComponent(action));
     });
 }
 
