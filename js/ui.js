@@ -211,7 +211,6 @@ function openEventEditor(eventId) {
     // Hide the cards, create section & cloud bar; show editor
     $('event-cards').style.display = 'none';
     document.querySelector('.event-create-section').style.display = 'none';
-    document.querySelector('.event-cloud-bar').style.display = 'none';
     $('event-editor').style.display = '';
 }
 
@@ -220,7 +219,6 @@ function closeEventEditor() {
     $('event-editor').style.display = 'none';
     $('event-cards').style.display = '';
     document.querySelector('.event-create-section').style.display = '';
-    document.querySelector('.event-cloud-bar').style.display = '';
     renderEventOverlay();
 }
 

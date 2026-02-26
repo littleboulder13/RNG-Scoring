@@ -401,10 +401,6 @@ document.addEventListener('DOMContentLoaded', () => {
     $('export-excel-btn').addEventListener('click', exportToExcel);
     updateSyncStatus();
 
-    // --- Event overlay: Push / Pull cloud ---
-    $('push-events-btn').addEventListener('click', pushAllEvents);
-    $('pull-events-btn').addEventListener('click', pullEvents);
-
     // --- Settings: sync URL ---
     $('settings-btn').addEventListener('click', promptSyncUrl);
     $('overlay-settings-btn').addEventListener('click', promptSyncUrl);
