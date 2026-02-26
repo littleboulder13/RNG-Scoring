@@ -15,9 +15,6 @@
 // DOM shorthand used by all modules
 const $ = (id) => document.getElementById(id);
 
-// Admin session state — reset when switching events
-let adminAuthenticated = false;
-
 /* =============================================================
    Install Prompt (PWA "Add to Home Screen")
    ============================================================= */
@@ -99,7 +96,6 @@ function hideEventOverlay() {
 
 function selectEvent(id) {
     setActiveEvent(id);
-    adminAuthenticated = false;
     hideEventOverlay();
     refreshAfterEventChange();
 }
@@ -113,6 +109,23 @@ async function refreshAfterEventChange() {
     showStageInfo();
     showShooterDivision();
     try { await updateUI(); } catch (e) { /* DB may not be ready yet */ }
+}
+
+/* =============================================================
+   Admin Session — Login / Logout / UI Toggle
+   ============================================================= */
+function updateAdminUI() {
+    if (isAdminLoggedIn()) {
+        document.body.classList.add('admin-mode');
+    } else {
+        document.body.classList.remove('admin-mode');
+    }
+    const icon  = isAdminLoggedIn() ? '\uD83D\uDD13' : '\uD83D\uDD12';
+    const title = isAdminLoggedIn() ? 'Admin Logout' : 'Admin Login';
+    ['overlay-admin-btn', 'admin-btn'].forEach(id => {
+        const btn = $(id);
+        if (btn) { btn.textContent = icon; btn.title = title; }
+    });
 }
 
 /* =============================================================
@@ -204,12 +217,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             setAdminPin(newPin);
+            adminLogin();
+            updateAdminUI();
             $('admin-pin-modal').style.display = 'none';
             if (_adminPinResolve) { _adminPinResolve(true); _adminPinResolve = null; }
         } else {
             // Verifying existing PIN
             const entered = $('admin-pin-input').value;
             if (verifyAdminPin(entered)) {
+                adminLogin();
+                updateAdminUI();
                 $('admin-pin-modal').style.display = 'none';
                 if (_adminPinResolve) { _adminPinResolve(true); _adminPinResolve = null; }
             } else {
@@ -219,11 +236,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- Event overlay: Create event (admin PIN required) ---
+    // --- Event overlay: Create event (admin-only, gated by visibility) ---
     $('create-event-btn').addEventListener('click', async () => {
-        const ok = await requestAdminPin('create an event');
-        if (!ok) return;
-
         const name = $('new-event-name').value.trim();
         if (!name) { alert('Please enter an event name.'); return; }
         const event = createEvent(name);
@@ -241,10 +255,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const editBtn = e.target.closest('.btn-edit-event');
         if (editBtn) {
-            if (hasAdminPin()) {
-                const ok = await requestAdminPin('edit this event');
-                if (!ok) return;
-            }
             openEventEditor(editBtn.dataset.id);
             return;
         }
@@ -252,10 +262,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (deleteBtn) {
             const ev = getEvents().find(ev => ev.id === deleteBtn.dataset.id);
             if (!ev) return;
-            if (hasAdminPin()) {
-                const ok = await requestAdminPin('delete this event');
-                if (!ok) return;
-            }
             if (!confirm(`Delete "${ev.name}"?\n\nThis removes the event and its stages/competitors. Scores in the database are kept.`)) return;
             deleteEvent(ev.id);
             renderEventOverlay();
@@ -350,12 +356,27 @@ document.addEventListener('DOMContentLoaded', () => {
     $('settings-pin-input').addEventListener('keydown', e => { if (e.key === 'Enter') unlockSettings(); });
     $('settings-save-btn').addEventListener('click', saveSettings);
 
+    // --- Admin login/logout buttons ---
+    async function handleAdminToggle() {
+        if (isAdminLoggedIn()) {
+            adminLogout();
+            updateAdminUI();
+        } else {
+            await requestAdminPin('log in as admin');
+        }
+    }
+    $('admin-btn').addEventListener('click', handleAdminToggle);
+    $('overlay-admin-btn').addEventListener('click', handleAdminToggle);
+
     // --- Populate UI for active event (immediate, from localStorage) ---
     if (getActiveEvent()) {
         populatePlayerDropdown();
         populateStageDropdown();
         updateActiveEventBar();
     }
+
+    // --- Restore admin session state ---
+    updateAdminUI();
 
     // --- Score confirmation modal ---
     let pendingScore = null;

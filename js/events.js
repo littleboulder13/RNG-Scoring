@@ -22,6 +22,17 @@ function verifyAdminPin(entered) {
     return entered === getAdminPin();
 }
 
+/* --- Admin Session (sessionStorage-based) --- */
+function isAdminLoggedIn() {
+    return sessionStorage.getItem('rng_admin_session') === '1';
+}
+function adminLogin() {
+    sessionStorage.setItem('rng_admin_session', '1');
+}
+function adminLogout() {
+    sessionStorage.removeItem('rng_admin_session');
+}
+
 function promptAdminPin(actionLabel) {
     const entered = prompt(`Enter admin PIN to ${actionLabel}:`);
     if (entered === null) return false;        // cancelled

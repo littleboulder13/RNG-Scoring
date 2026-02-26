@@ -138,9 +138,9 @@ function renderEventOverlay() {
                 </div>
             </div>
             <div class="event-card-actions">
-                <button class="btn-edit-event" data-id="${e.id}">✎ Edit</button>
+                <button class="btn-edit-event admin-only" data-id="${e.id}">✎ Edit</button>
                 <button class="btn-select-event" data-id="${e.id}">Select</button>
-                <button class="btn-delete-event" data-id="${e.id}">\u2715</button>
+                <button class="btn-delete-event admin-only" data-id="${e.id}">\u2715</button>
             </div>
         </div>
     `).join('');

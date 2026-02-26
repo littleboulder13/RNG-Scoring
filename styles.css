@@ -1096,3 +1096,16 @@ button {
 .btn-change-event:hover {
     background: rgba(255,255,255,0.3);
 }
+
+/* Admin-only visibility — hidden when not logged in as admin */
+body:not(.admin-mode) .admin-only {
+    display: none !important;
+}
+
+.btn-admin-lock {
+    font-size: 1.1rem;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0.25rem;
+}

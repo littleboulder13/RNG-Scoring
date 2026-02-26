@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v70';
+const APP_VERSION = 'v71';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxl5_JrmYOV_oOW0COYUlGa_XrEFNT57CHJyTOznHQbO_FivjN_KYv2zkgqbD3N4nwz/exec';
 
 function getSyncUrl() {
@@ -27,13 +27,13 @@ function openSettingsModal() {
     saveMsg.style.display = 'none';
     $('settings-admin-pin').value = '';
 
-    if (hasAdminPin()) {
-        // PIN is set — show the PIN gate
+    if (hasAdminPin() && !isAdminLoggedIn()) {
+        // PIN is set and not admin — show the PIN gate
         gate.style.display = '';
         body.style.display = 'none';
         noPin.style.display = 'none';
     } else {
-        // No PIN set — skip gate, go straight to settings
+        // No PIN set or already admin — skip gate, go straight to settings
         gate.style.display = 'none';
         body.style.display = '';
     }
