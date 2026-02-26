@@ -82,8 +82,30 @@ if ('serviceWorker' in navigator) {
                 console.log('Service Worker registered');
                 // Force update check on every load
                 reg.update().catch(() => {});
+
+                // When a new service worker is installed, prompt reload
+                reg.addEventListener('updatefound', () => {
+                    const newWorker = reg.installing;
+                    if (newWorker) {
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'activated') {
+                                console.log('New version available — reloading');
+                                window.location.reload();
+                            }
+                        });
+                    }
+                });
             })
             .catch(err => console.error('SW registration failed:', err));
+    });
+
+    // If a new SW took over, reload immediately
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+            refreshing = true;
+            window.location.reload();
+        }
     });
 }
 
