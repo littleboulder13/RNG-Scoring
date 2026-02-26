@@ -391,7 +391,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Score Entry tab ---
-    $('stage').addEventListener('change', showStageInfo);
+    $('stage').addEventListener('change', () => {
+        showStageInfo();
+        updateScoredShooterStyles();
+    });
     $('player-name').addEventListener('change', showShooterDivision);
     $('dnf').addEventListener('change', toggleDNFFields);
     toggleDNFFields();
@@ -508,6 +511,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showShooterDivision();
             toggleDNFFields();
             await updateUI();
+            updateScoredShooterStyles();
         } catch (err) {
             console.error('Save error:', err);
             alert('Error saving score: ' + err.message);

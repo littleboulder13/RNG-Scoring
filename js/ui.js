@@ -16,6 +16,35 @@ function populatePlayerDropdown() {
         sel.appendChild(opt);
     });
     if (prev && players.find(p => p.name === prev)) sel.value = prev;
+    // Update scored styling after populating
+    updateScoredShooterStyles();
+}
+
+// Grey out shooters who already have a score on the selected stage
+async function updateScoredShooterStyles() {
+    const sel = $('player-name');
+    const stageVal = $('stage')?.value;
+    if (!sel || !stageVal) {
+        // No stage selected — clear all styling
+        Array.from(sel?.options || []).forEach(opt => {
+            opt.style.color = '';
+        });
+        return;
+    }
+    try {
+        await dbReady;
+        const scores = await getEventScores();
+        const scoredSet = new Set(
+            scores.filter(s => s.stage === stageVal).map(s => s.playerName)
+        );
+        Array.from(sel.options).forEach(opt => {
+            if (opt.value && scoredSet.has(opt.value)) {
+                opt.style.color = '#aaa';
+            } else {
+                opt.style.color = '';
+            }
+        });
+    } catch (_) { /* DB may not be ready */ }
 }
 
 // --- Stage Dropdown ---
