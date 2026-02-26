@@ -100,16 +100,12 @@ function _postToAppsScript(payload, queryString) {
         xhr.open('POST', getSyncUrl() + (queryString || ''));
         xhr.setRequestHeader('Content-Type', 'text/plain');
         xhr.onload = function () {
-            if (xhr.status >= 400) {
-                reject(new Error('HTTP ' + xhr.status + ': ' + xhr.responseText.substring(0, 200)));
-                return;
-            }
             try { resolve(JSON.parse(xhr.responseText)); }
             catch (_) { resolve({ _raw: xhr.responseText }); }
         };
-        xhr.onerror = function () { reject(new Error('XHR POST onerror (readyState=' + xhr.readyState + ', status=' + xhr.status + ')')); };
-        xhr.ontimeout = function () { reject(new Error('XHR POST timeout after 15s')); };
-        xhr.timeout = 15000;
+        xhr.onerror = function () { reject(new Error('Network request failed')); };
+        xhr.ontimeout = function () { reject(new Error('Request timed out')); };
+        xhr.timeout = 30000;
         xhr.send(JSON.stringify(payload));
     });
 }
@@ -221,7 +217,7 @@ async function pushAllEvents() {
     if (failed === 0) {
         alert(`\u2713 Pushed ${success} event(s) to the cloud!`);
     } else {
-        alert(`Pushed ${success} event(s). ${failed} failed \u2014 check your connection and try again.`);
+        alert(`Pushed ${success}, failed ${failed}.\n\nApp: ${APP_VERSION}\nOnline: ${navigator.onLine}\nStandalone: ${window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches}\n\nTry opening in Safari (not the app) to sync.`);
     }
 
     if (pushBtn) { pushBtn.disabled = false; pushBtn.textContent = '\u2B06 Push Events to Cloud'; }
@@ -289,7 +285,12 @@ async function pullEvents() {
         alert(`\u2713 Pulled events from cloud: ${parts.join(', ') || 'already up to date'}`);
     } catch (err) {
         console.error('Pull error:', err);
-        alert('Failed to pull events: ' + err.message);
+        alert('Failed to pull events: ' + err.message +
+            '\n\nApp: ' + APP_VERSION +
+            '\nURL: ' + getSyncUrl().substring(0, 60) + '...' +
+            '\nOnline: ' + navigator.onLine +
+            '\nStandalone: ' + (window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) +
+            '\n\nTry opening in Safari (not the app) to sync.');
     } finally {
         if (pullBtn) { pullBtn.disabled = false; pullBtn.textContent = '\u2b07 Pull Events from Cloud'; }
     }
