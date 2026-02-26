@@ -1,11 +1,17 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v96';
-const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxl5_JrmYOV_oOW0COYUlGa_XrEFNT57CHJyTOznHQbO_FivjN_KYv2zkgqbD3N4nwz/exec';
+const APP_VERSION = 'v97';
+const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxDwug8yxfGbuqVKWUb7WTZh89NJQzp5ZaIIC3aPs4w4iiWogk0Yvg7M9ASgy70NOkW/exec';
 
 function getSyncUrl() {
-    return localStorage.getItem('rng_sync_url') || DEFAULT_SYNC_URL;
+    // Clear stale old deployment URL so we use the new one
+    var stored = localStorage.getItem('rng_sync_url');
+    if (stored && stored.indexOf('AKfycbxl5_JrmYOV') !== -1) {
+        localStorage.removeItem('rng_sync_url');
+        stored = null;
+    }
+    return stored || DEFAULT_SYNC_URL;
 }
 
 function setSyncUrl(url) {
