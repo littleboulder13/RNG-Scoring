@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v65';
+const APP_VERSION = 'v66';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxl5_JrmYOV_oOW0COYUlGa_XrEFNT57CHJyTOznHQbO_FivjN_KYv2zkgqbD3N4nwz/exec';
 
 function getSyncUrl() {
@@ -127,45 +127,26 @@ function _postToAppsScript(payload, queryString) {
     });
 }
 
-/* --- Helper: Pull data from Apps Script --- */
-/* Try fetch GET first (doGet). If CORS blocks it, fall back to POST with */
-/* the action in a URL query parameter (needs updated doPost).            */
+/* --- Helper: Pull data from Apps Script via form-encoded POST --- */
+/* Form-encoded POST avoids CORS preflight AND puts form fields directly   */
+/* into e.parameter on the server, so e.parameter.action = 'pullEvents'.   */
 function _fetchFromAppsScript(action) {
-    const url = getSyncUrl() + '?action=' + action + '&_t=' + Date.now();
-
-    return fetch(url)
-        .then(r => r.text())
-        .then(text => {
-            try { return JSON.parse(text); }
-            catch (_) { throw new Error('Non-JSON: ' + text.substring(0, 200)); }
-        })
-        .catch(fetchErr => {
-            // fetch GET blocked by CORS — fall back to POST with action in query string
-            console.warn('fetch GET failed (' + fetchErr.message + ') — trying POST');
-            return _postToAppsScript({}, '?action=' + action);
-        })
-        .then(data => {
-            // Detect old Apps Script that can't handle pull actions
-            if (data && data.success === false && data.error) {
-                var err = data.error;
-                if (err.indexOf('No scores') >= 0 || err.indexOf('JSON') >= 0 ||
-                    err.indexOf('Unexpected') >= 0 || err.indexOf('postData') >= 0) {
-                    throw new Error(
-                        'Your Google Apps Script needs to be redeployed.\n\n' +
-                        'IMPORTANT — Create a NEW deployment:\n' +
-                        '1. Open your Apps Script project\n' +
-                        '2. Replace ALL code with the latest google-apps-script.js\n' +
-                        '3. Click Deploy → NEW deployment (not Manage)\n' +
-                        '4. Type: Web app | Execute as: Me | Access: Anyone\n' +
-                        '5. Click Deploy\n' +
-                        '6. Copy the NEW URL\n' +
-                        '7. Paste it in the app Settings (⚙) → Sync URL\n\n' +
-                        'Server said: ' + err
-                    );
-                }
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', getSyncUrl());
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        xhr.onload = function () {
+            try {
+                resolve(JSON.parse(xhr.responseText));
+            } catch (_) {
+                reject(new Error('Invalid response: ' + xhr.responseText.substring(0, 200)));
             }
-            return data;
-        });
+        };
+        xhr.onerror = function () { reject(new Error('Network request failed')); };
+        xhr.ontimeout = function () { reject(new Error('Request timed out')); };
+        xhr.timeout = 30000;
+        xhr.send('action=' + encodeURIComponent(action));
+    });
 }
 
 function updateSyncStatus() {
