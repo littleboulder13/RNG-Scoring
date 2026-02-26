@@ -96,7 +96,7 @@ function promptSyncUrl() {
 async function autoSyncUrl() {
     if (!navigator.onLine) return;
     try {
-        const data = await _postToAppsScript({ action: 'pullConfig' });
+        const data = await _postToAppsScript({}, '?action=pullConfig');
         if (data && data.syncUrl && data.syncUrl.startsWith('https://script.google.com/')) {
             const current = getSyncUrl();
             if (data.syncUrl !== current) {
@@ -110,10 +110,10 @@ async function autoSyncUrl() {
 }
 
 /* --- Helper: POST to Apps Script via XHR (reliable on iOS PWAs) --- */
-function _postToAppsScript(payload) {
+function _postToAppsScript(payload, queryString) {
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', getSyncUrl());
+        xhr.open('POST', getSyncUrl() + (queryString || ''));
         xhr.setRequestHeader('Content-Type', 'text/plain');
         xhr.onload = function () {
             try { resolve(JSON.parse(xhr.responseText)); }
@@ -209,7 +209,7 @@ async function pullEvents() {
     if (pullBtn) { pullBtn.disabled = true; pullBtn.textContent = 'Pulling\u2026'; }
 
     try {
-        const data = await _postToAppsScript({ action: 'pullEvents' });
+        const data = await _postToAppsScript({}, '?action=pullEvents');
 
         // Debug: show raw response if no events found
         if (!data.events || !data.events.length) {

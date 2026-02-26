@@ -13,25 +13,20 @@
 
 function doPost(e) {
   try {
+    // Check URL query parameter first (reliable even if body is garbled)
+    var paramAction = (e && e.parameter && e.parameter.action) || '';
+    if (paramAction === 'pullEvents') return _pullEvents();
+    if (paramAction === 'pullConfig') return _pullConfig();
+
+    // Parse body for actions that need data
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var data = JSON.parse(e.postData.contents);
     var action = data.action || 'syncScores';
 
-    if (action === 'pushEvent') {
-      return _pushEvent(ss, data.event);
-    }
-
-    if (action === 'pushConfig') {
-      return _pushConfig(ss, data.config);
-    }
-
-    if (action === 'pullEvents') {
-      return _pullEvents();
-    }
-
-    if (action === 'pullConfig') {
-      return _pullConfig();
-    }
+    if (action === 'pushEvent') return _pushEvent(ss, data.event);
+    if (action === 'pushConfig') return _pushConfig(ss, data.config);
+    if (action === 'pullEvents') return _pullEvents();
+    if (action === 'pullConfig') return _pullConfig();
 
     // Default: syncScores
     return _syncScores(ss, data);
