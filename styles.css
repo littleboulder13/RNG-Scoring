@@ -993,6 +993,49 @@ button {
     border-color: var(--error-color);
 }
 
+/* Archived (Old) Events */
+.archived-events-title {
+    font-size: 1rem;
+    color: #888;
+    margin-bottom: 0.75rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #e0e0e0;
+}
+
+.archived-event-card {
+    opacity: 0.65;
+    border-left: 3px solid #795548;
+}
+
+.btn-restore-event {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #a5d6a7;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.btn-restore-event:hover {
+    background: #c8e6c9;
+}
+
+.btn-perm-delete-event {
+    background: transparent;
+    color: #999;
+    border: 1px solid #ddd;
+    padding: 0.5rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.btn-perm-delete-event:hover {
+    color: var(--error-color);
+    border-color: var(--error-color);
+}
+
 /* Create event form */
 .event-create-section {
     background: white;

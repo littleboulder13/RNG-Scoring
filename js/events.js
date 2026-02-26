@@ -67,6 +67,46 @@ function deleteEvent(id) {
     if (getActiveEventId() === id) clearActiveEvent();
 }
 
+/* --- Archived (Old) Events --- */
+function getArchivedEvents() {
+    return JSON.parse(localStorage.getItem('rng_archived_events') || '[]');
+}
+
+function saveArchivedEvents(list) {
+    localStorage.setItem('rng_archived_events', JSON.stringify(list));
+}
+
+function archiveEvent(id) {
+    const events = getEvents();
+    const ev = events.find(e => e.id === id);
+    if (!ev) return null;
+    // Move to archive
+    const archived = getArchivedEvents();
+    archived.push(ev);
+    saveArchivedEvents(archived);
+    // Remove from active events
+    saveEvents(events.filter(e => e.id !== id));
+    if (getActiveEventId() === id) clearActiveEvent();
+    return ev;
+}
+
+function restoreEvent(id) {
+    const archived = getArchivedEvents();
+    const ev = archived.find(e => e.id === id);
+    if (!ev) return null;
+    // Move back to active events
+    const events = getEvents();
+    events.push(ev);
+    saveEvents(events);
+    // Remove from archive
+    saveArchivedEvents(archived.filter(e => e.id !== id));
+    return ev;
+}
+
+function permanentlyDeleteEvent(id) {
+    saveArchivedEvents(getArchivedEvents().filter(e => e.id !== id));
+}
+
 function updateEvent(id, updates) {
     const events = getEvents();
     const idx = events.findIndex(e => e.id === id);

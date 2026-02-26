@@ -262,8 +262,30 @@ document.addEventListener('DOMContentLoaded', () => {
         if (deleteBtn) {
             const ev = getEvents().find(ev => ev.id === deleteBtn.dataset.id);
             if (!ev) return;
-            if (!confirm(`Delete "${ev.name}"?\n\nThis removes the event and its stages/competitors. Scores in the database are kept.`)) return;
-            deleteEvent(ev.id);
+            if (!confirm(`Move "${ev.name}" to Old Events?\n\nYou can restore it later from the Old Events section.`)) return;
+            archiveEvent(ev.id);
+            pushArchiveEvent(ev.id);
+            renderEventOverlay();
+        }
+    });
+
+    // --- Archived events: Restore / Permanently Delete (delegated) ---
+    $('archived-events').addEventListener('click', async (e) => {
+        const restoreBtn = e.target.closest('.btn-restore-event');
+        if (restoreBtn) {
+            const ev = restoreEvent(restoreBtn.dataset.id);
+            if (ev) pushRestoreEvent(ev.id);
+            renderEventOverlay();
+            return;
+        }
+        const permDeleteBtn = e.target.closest('.btn-perm-delete-event');
+        if (permDeleteBtn) {
+            const archived = getArchivedEvents();
+            const ev = archived.find(a => a.id === permDeleteBtn.dataset.id);
+            if (!ev) return;
+            if (!confirm(`Permanently delete "${ev.name}"?\n\nThis cannot be undone.`)) return;
+            permanentlyDeleteEvent(ev.id);
+            pushPermanentlyDeleteEvent(ev.id);
             renderEventOverlay();
         }
     });

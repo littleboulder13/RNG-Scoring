@@ -17,6 +17,7 @@ function doPost(e) {
     var paramAction = (e && e.parameter && e.parameter.action) || '';
     if (paramAction === 'pullEvents') return _pullEvents();
     if (paramAction === 'pullConfig') return _pullConfig();
+    if (paramAction === 'pullArchivedEvents') return _pullArchivedEvents();
 
     // Parse body for actions that need data
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -27,6 +28,9 @@ function doPost(e) {
     if (action === 'pushConfig') return _pushConfig(ss, data.config);
     if (action === 'pullEvents') return _pullEvents();
     if (action === 'pullConfig') return _pullConfig();
+    if (action === 'archiveEvent') return _archiveEvent(ss, data.eventId);
+    if (action === 'restoreEvent') return _restoreEvent(ss, data.eventId);
+    if (action === 'permanentlyDeleteEvent') return _permanentlyDeleteEvent(ss, data.eventId);
 
     // Default: syncScores
     return _syncScores(ss, data);
@@ -283,6 +287,148 @@ function _pullEvents() {
       name:        row[nameCol],
       stages:      safeParse(row[stagesCol], []),
       competitors: safeParse(row[compCol], [])
+    };
+  });
+
+  return _jsonResponse({ events: events });
+}
+
+/* --- Archive Event (move from Events → ArchivedEvents) --- */
+function _archiveEvent(ss, eventId) {
+  if (!eventId) return _jsonResponse({ success: false, error: 'No eventId' });
+
+  var sheet = ss.getSheetByName('Events') || ss.getSheetByName('_Events');
+  if (!sheet || sheet.getLastRow() < 2) {
+    return _jsonResponse({ success: false, error: 'Events sheet not found or empty' });
+  }
+
+  // Find the event row
+  var values = sheet.getDataRange().getValues();
+  var rowIndex = -1;
+  var rowData = null;
+  for (var r = 1; r < values.length; r++) {
+    if (values[r][0] === eventId) {
+      rowIndex = r + 1; // 1-indexed
+      rowData = values[r];
+      break;
+    }
+  }
+  if (rowIndex === -1) return _jsonResponse({ success: false, error: 'Event not found' });
+
+  // Ensure ArchivedEvents sheet exists
+  var archiveSheet = ss.getSheetByName('ArchivedEvents');
+  if (!archiveSheet) {
+    archiveSheet = ss.insertSheet('ArchivedEvents');
+    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'ArchivedAt'];
+    archiveSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    archiveSheet.getRange(1, 1, 1, headers.length)
+      .setFontWeight('bold')
+      .setBackground('#795548')
+      .setFontColor('#ffffff');
+    archiveSheet.setFrozenRows(1);
+  }
+
+  // Copy to ArchivedEvents with timestamp
+  var archiveRow = rowData.slice(0, 5);
+  archiveRow.push(new Date().toISOString());
+  archiveSheet.getRange(archiveSheet.getLastRow() + 1, 1, 1, archiveRow.length).setValues([archiveRow]);
+
+  // Remove from Events
+  sheet.deleteRow(rowIndex);
+
+  return _jsonResponse({ success: true, eventId: eventId });
+}
+
+/* --- Restore Event (move from ArchivedEvents → Events) --- */
+function _restoreEvent(ss, eventId) {
+  if (!eventId) return _jsonResponse({ success: false, error: 'No eventId' });
+
+  var archiveSheet = ss.getSheetByName('ArchivedEvents');
+  if (!archiveSheet || archiveSheet.getLastRow() < 2) {
+    return _jsonResponse({ success: false, error: 'ArchivedEvents sheet not found or empty' });
+  }
+
+  // Find the event row in archive
+  var values = archiveSheet.getDataRange().getValues();
+  var rowIndex = -1;
+  var rowData = null;
+  for (var r = 1; r < values.length; r++) {
+    if (values[r][0] === eventId) {
+      rowIndex = r + 1;
+      rowData = values[r];
+      break;
+    }
+  }
+  if (rowIndex === -1) return _jsonResponse({ success: false, error: 'Archived event not found' });
+
+  // Ensure Events sheet exists
+  var sheet = ss.getSheetByName('Events') || ss.getSheetByName('_Events');
+  if (!sheet) {
+    sheet = ss.insertSheet('Events');
+    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated'];
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(1, 1, 1, headers.length)
+      .setFontWeight('bold')
+      .setBackground('#1565c0')
+      .setFontColor('#ffffff');
+    sheet.setFrozenRows(1);
+  }
+
+  // Copy back (first 5 columns: ID, Name, Stages, Competitors, Updated)
+  var restoreRow = rowData.slice(0, 5);
+  restoreRow[4] = new Date().toISOString(); // update timestamp
+  sheet.getRange(sheet.getLastRow() + 1, 1, 1, restoreRow.length).setValues([restoreRow]);
+
+  // Remove from ArchivedEvents
+  archiveSheet.deleteRow(rowIndex);
+
+  return _jsonResponse({ success: true, eventId: eventId });
+}
+
+/* --- Permanently Delete Archived Event --- */
+function _permanentlyDeleteEvent(ss, eventId) {
+  if (!eventId) return _jsonResponse({ success: false, error: 'No eventId' });
+
+  var archiveSheet = ss.getSheetByName('ArchivedEvents');
+  if (!archiveSheet || archiveSheet.getLastRow() < 2) {
+    return _jsonResponse({ success: false, error: 'ArchivedEvents sheet not found or empty' });
+  }
+
+  var values = archiveSheet.getDataRange().getValues();
+  for (var r = 1; r < values.length; r++) {
+    if (values[r][0] === eventId) {
+      archiveSheet.deleteRow(r + 1);
+      return _jsonResponse({ success: true, eventId: eventId });
+    }
+  }
+
+  return _jsonResponse({ success: false, error: 'Archived event not found' });
+}
+
+/* --- Pull Archived Events --- */
+function _pullArchivedEvents() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('ArchivedEvents');
+
+  if (!sheet || sheet.getLastRow() < 2) {
+    return _jsonResponse({ events: [] });
+  }
+
+  var numCols = sheet.getLastColumn();
+  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, numCols).getValues();
+
+  function safeParse(val, fallback) {
+    if (!val || typeof val !== 'string') return fallback;
+    try { return JSON.parse(val); }
+    catch (_) { return fallback; }
+  }
+
+  var events = data.map(function(row) {
+    return {
+      id:          row[0],
+      name:        row[1],
+      stages:      safeParse(row[2], []),
+      competitors: safeParse(row[3], [])
     };
   });
 

@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v72';
+const APP_VERSION = 'v73';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxl5_JrmYOV_oOW0COYUlGa_XrEFNT57CHJyTOznHQbO_FivjN_KYv2zkgqbD3N4nwz/exec';
 
 function getSyncUrl() {
@@ -172,6 +172,34 @@ async function pushEventConfig(eventId) {
     }
 }
 
+/* --- Push archive / restore / permanent-delete actions to the cloud --- */
+async function pushArchiveEvent(eventId) {
+    if (!navigator.onLine) return;
+    try {
+        await _postToAppsScript({ action: 'archiveEvent', eventId });
+    } catch (err) {
+        console.warn('Archive push failed:', err.message);
+    }
+}
+
+async function pushRestoreEvent(eventId) {
+    if (!navigator.onLine) return;
+    try {
+        await _postToAppsScript({ action: 'restoreEvent', eventId });
+    } catch (err) {
+        console.warn('Restore push failed:', err.message);
+    }
+}
+
+async function pushPermanentlyDeleteEvent(eventId) {
+    if (!navigator.onLine) return;
+    try {
+        await _postToAppsScript({ action: 'permanentlyDeleteEvent', eventId });
+    } catch (err) {
+        console.warn('Permanent delete push failed:', err.message);
+    }
+}
+
 /* --- Push ALL local events to the cloud --- */
 async function pushAllEvents() {
     if (!navigator.onLine) return alert('Cannot push events while offline.');
@@ -241,11 +269,31 @@ async function pullEvents() {
         }
 
         saveEvents(local);
+
+        // Also pull archived events from cloud
+        let archivedPulled = 0;
+        try {
+            const archiveData = await _fetchFromAppsScript('pullArchivedEvents');
+            if (archiveData.events && archiveData.events.length) {
+                const localArchived = getArchivedEvents();
+                for (const remote of archiveData.events) {
+                    if (!localArchived.find(e => e.id === remote.id)) {
+                        localArchived.push(remote);
+                        archivedPulled++;
+                    }
+                }
+                saveArchivedEvents(localArchived);
+            }
+        } catch (archErr) {
+            console.warn('Failed to pull archived events:', archErr.message);
+        }
+
         renderEventOverlay();
 
         const parts = [];
         if (added)   parts.push(`${added} new`);
         if (updated) parts.push(`${updated} updated`);
+        if (archivedPulled) parts.push(`${archivedPulled} old`);
         alert(`\u2713 Pulled events from cloud: ${parts.join(', ') || 'already up to date'}`);
     } catch (err) {
         console.error('Pull error:', err);

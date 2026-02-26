@@ -125,25 +125,57 @@ function renderEventOverlay() {
 
     if (!events.length) {
         cardsEl.innerHTML = '<div class="empty-state">No events yet. Create your first event below.</div>';
+    } else {
+        cardsEl.innerHTML = events.map(e => `
+            <div class="event-card">
+                <div class="event-card-info">
+                    <h3>${e.name}</h3>
+                    <div class="event-card-meta">
+                        \uD83C\uDFAF ${e.stages.length} stage${e.stages.length !== 1 ? 's' : ''}
+                        &nbsp;·&nbsp; \uD83D\uDC65 ${e.competitors.length} shooter${e.competitors.length !== 1 ? 's' : ''}
+                    </div>
+                </div>
+                <div class="event-card-actions">
+                    <button class="btn-edit-event admin-only" data-id="${e.id}">✎ Edit</button>
+                    <button class="btn-select-event" data-id="${e.id}">Select</button>
+                    <button class="btn-delete-event admin-only" data-id="${e.id}">\u2715</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // Archived (old) events — admin only
+    renderArchivedEvents();
+}
+
+function renderArchivedEvents() {
+    const el = $('archived-events');
+    if (!el) return;
+    const archived = getArchivedEvents();
+
+    if (!archived.length) {
+        el.innerHTML = '';
         return;
     }
 
-    cardsEl.innerHTML = events.map(e => `
-        <div class="event-card">
-            <div class="event-card-info">
-                <h3>${e.name}</h3>
-                <div class="event-card-meta">
-                    \uD83C\uDFAF ${e.stages.length} stage${e.stages.length !== 1 ? 's' : ''}
-                    &nbsp;·&nbsp; \uD83D\uDC65 ${e.competitors.length} shooter${e.competitors.length !== 1 ? 's' : ''}
+    el.innerHTML = `
+        <h3 class="archived-events-title">Old Events</h3>
+        ${archived.map(e => `
+            <div class="event-card archived-event-card">
+                <div class="event-card-info">
+                    <h3>${e.name}</h3>
+                    <div class="event-card-meta">
+                        \uD83C\uDFAF ${e.stages.length} stage${e.stages.length !== 1 ? 's' : ''}
+                        &nbsp;·&nbsp; \uD83D\uDC65 ${e.competitors.length} shooter${e.competitors.length !== 1 ? 's' : ''}
+                    </div>
+                </div>
+                <div class="event-card-actions">
+                    <button class="btn-restore-event" data-id="${e.id}">↩ Restore</button>
+                    <button class="btn-perm-delete-event" data-id="${e.id}">\uD83D\uDDD1 Delete</button>
                 </div>
             </div>
-            <div class="event-card-actions">
-                <button class="btn-edit-event admin-only" data-id="${e.id}">✎ Edit</button>
-                <button class="btn-select-event" data-id="${e.id}">Select</button>
-                <button class="btn-delete-event admin-only" data-id="${e.id}">\u2715</button>
-            </div>
-        </div>
-    `).join('');
+        `).join('')}
+    `;
 }
 
 // --- Active Event Header Bar ---
