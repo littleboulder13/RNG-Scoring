@@ -42,33 +42,20 @@ function doPost(e) {
 
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) || 'status';
-  var callback = (e && e.parameter && e.parameter.callback) || '';
 
-  var result;
-  if (action === 'pullEvents')          result = _pullEventsData();
-  else if (action === 'pullConfig')      result = _pullConfigData();
-  else if (action === 'pullArchivedEvents') result = _pullArchivedEventsData();
-  else result = { status: 'ok', message: 'Stilly RNG sync endpoint is running' };
-
-  // iframe+postMessage mode — bypasses CORS, cookies, tracking restrictions
-  // The iframe loads as a normal page navigation, then sends data back via postMessage.
-  var mode = (e && e.parameter && e.parameter.mode) || '';
-  if (mode === 'iframe') {
-    var html = '<html><body><script>'
-      + 'parent.postMessage(' + JSON.stringify(JSON.stringify(result)) + ', "*");'
-      + '</' + 'script></body></html>';
-    return HtmlService.createHtmlOutput(html)
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  if (action === 'pullEvents') {
+    return _pullEvents();
   }
 
-  // JSONP support — bypasses CORS issues on iOS PWA standalone mode
-  if (callback && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(callback)) {
-    return ContentService
-      .createTextOutput(callback + '(' + JSON.stringify(result) + ')')
-      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  if (action === 'pullConfig') {
+    return _pullConfig();
   }
 
-  return _jsonResponse(result);
+  if (action === 'pullArchivedEvents') {
+    return _pullArchivedEvents();
+  }
+
+  return _jsonResponse({ status: 'ok', message: 'Stilly RNG sync endpoint is running' });
 }
 
 /* --- Score Sync (one tab per stage, all competitors listed) --- */
@@ -271,39 +258,50 @@ function _pushEvent(ss, ev) {
   return _jsonResponse({ success: true, eventId: ev.id });
 }
 
-/* --- Pull Events (data helper used by doGet for JSONP) --- */
-function _pullEventsData() {
+/* --- Pull Events --- */
+function _pullEvents() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Events') || ss.getSheetByName('_Events');
 
   if (!sheet || sheet.getLastRow() < 2) {
-    return { events: [] };
+    return _jsonResponse({ events: [] });
   }
 
-  var numRows = sheet.getLastRow() - 1;
-  var data = sheet.getRange(2, 1, numRows, 6).getValues();
+  var numCols = sheet.getLastColumn();
+  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, numCols).getValues();
 
+  // Read headers to find column positions
+  var headers = sheet.getRange(1, 1, 1, numCols).getValues()[0];
+  var colIdx = {};
+  for (var c = 0; c < headers.length; c++) {
+    colIdx[String(headers[c]).toLowerCase().replace(/\s+/g, '')] = c;
+  }
+
+  // Safe JSON parse helper — returns fallback if value isn't valid JSON
   function safeParse(val, fallback) {
     if (!val || typeof val !== 'string') return fallback;
     try { return JSON.parse(val); }
     catch (_) { return fallback; }
   }
 
-  return {
-    events: data.map(function(row) {
-      return {
-        id:          row[0],
-        name:        row[1],
-        stages:      safeParse(row[2], []),
-        competitors: safeParse(row[3], []),
-        password:    row[5] || ''
-      };
-    })
-  };
-}
+  var events = data.map(function(row) {
+    var idCol   = colIdx['eventid'] !== undefined ? colIdx['eventid'] : 0;
+    var nameCol = colIdx['name'] !== undefined ? colIdx['name'] : 1;
+    // Stages/Competitors could be at different positions depending on whether Date column exists
+    var stagesCol = colIdx['stages'] !== undefined ? colIdx['stages'] : (numCols >= 6 ? 3 : 2);
+    var compCol   = colIdx['competitors'] !== undefined ? colIdx['competitors'] : (numCols >= 6 ? 4 : 3);
 
-function _pullEvents() {
-  return _jsonResponse(_pullEventsData());
+    var pwCol = colIdx['password'] !== undefined ? colIdx['password'] : 5;
+    return {
+      id:          row[idCol],
+      name:        row[nameCol],
+      stages:      safeParse(row[stagesCol], []),
+      competitors: safeParse(row[compCol], []),
+      password:    row[pwCol] || ''
+    };
+  });
+
+  return _jsonResponse({ events: events });
 }
 
 /* --- Archive Event (move from Events → ArchivedEvents) --- */
@@ -315,20 +313,18 @@ function _archiveEvent(ss, eventId) {
     return _jsonResponse({ success: false, error: 'Events sheet not found or empty' });
   }
 
-  // Find the event row
   var values = sheet.getDataRange().getValues();
   var rowIndex = -1;
   var rowData = null;
   for (var r = 1; r < values.length; r++) {
     if (values[r][0] === eventId) {
-      rowIndex = r + 1; // 1-indexed
+      rowIndex = r + 1;
       rowData = values[r];
       break;
     }
   }
   if (rowIndex === -1) return _jsonResponse({ success: false, error: 'Event not found' });
 
-  // Ensure ArchivedEvents sheet exists
   var archiveSheet = ss.getSheetByName('ArchivedEvents');
   if (!archiveSheet) {
     archiveSheet = ss.insertSheet('ArchivedEvents');
@@ -341,12 +337,9 @@ function _archiveEvent(ss, eventId) {
     archiveSheet.setFrozenRows(1);
   }
 
-  // Copy to ArchivedEvents with timestamp
   var archiveRow = rowData.slice(0, 6);
   archiveRow.push(new Date().toISOString());
   archiveSheet.getRange(archiveSheet.getLastRow() + 1, 1, 1, archiveRow.length).setValues([archiveRow]);
-
-  // Remove from Events
   sheet.deleteRow(rowIndex);
 
   return _jsonResponse({ success: true, eventId: eventId });
@@ -361,7 +354,6 @@ function _restoreEvent(ss, eventId) {
     return _jsonResponse({ success: false, error: 'ArchivedEvents sheet not found or empty' });
   }
 
-  // Find the event row in archive
   var values = archiveSheet.getDataRange().getValues();
   var rowIndex = -1;
   var rowData = null;
@@ -374,7 +366,6 @@ function _restoreEvent(ss, eventId) {
   }
   if (rowIndex === -1) return _jsonResponse({ success: false, error: 'Archived event not found' });
 
-  // Ensure Events sheet exists
   var sheet = ss.getSheetByName('Events') || ss.getSheetByName('_Events');
   if (!sheet) {
     sheet = ss.insertSheet('Events');
@@ -387,12 +378,9 @@ function _restoreEvent(ss, eventId) {
     sheet.setFrozenRows(1);
   }
 
-  // Copy back (first 6 columns: ID, Name, Stages, Competitors, Updated, Password)
   var restoreRow = rowData.slice(0, 6);
-  restoreRow[4] = new Date().toISOString(); // update timestamp
+  restoreRow[4] = new Date().toISOString();
   sheet.getRange(sheet.getLastRow() + 1, 1, 1, restoreRow.length).setValues([restoreRow]);
-
-  // Remove from ArchivedEvents
   archiveSheet.deleteRow(rowIndex);
 
   return _jsonResponse({ success: true, eventId: eventId });
@@ -407,7 +395,6 @@ function _permanentlyDeleteEvent(ss, eventId, eventName, stageNames) {
     return _jsonResponse({ success: false, error: 'ArchivedEvents sheet not found or empty' });
   }
 
-  // If eventName not provided, read it from the archive row
   var values = archiveSheet.getDataRange().getValues();
   var rowToDelete = -1;
   for (var r = 1; r < values.length; r++) {
@@ -421,10 +408,8 @@ function _permanentlyDeleteEvent(ss, eventId, eventName, stageNames) {
       break;
     }
   }
-
   if (rowToDelete === -1) return _jsonResponse({ success: false, error: 'Archived event not found' });
 
-  // Delete score tabs for this event ("EventName - StageName")
   var deletedTabs = [];
   if (eventName && stageNames && stageNames.length) {
     for (var i = 0; i < stageNames.length; i++) {
@@ -437,19 +422,18 @@ function _permanentlyDeleteEvent(ss, eventId, eventName, stageNames) {
     }
   }
 
-  // Delete the archived event row
   archiveSheet.deleteRow(rowToDelete);
 
   return _jsonResponse({ success: true, eventId: eventId, deletedTabs: deletedTabs });
 }
 
-/* --- Pull Archived Events (data helper used by doGet for JSONP) --- */
-function _pullArchivedEventsData() {
+/* --- Pull Archived Events --- */
+function _pullArchivedEvents() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('ArchivedEvents');
 
   if (!sheet || sheet.getLastRow() < 2) {
-    return { events: [] };
+    return _jsonResponse({ events: [] });
   }
 
   var numCols = sheet.getLastColumn();
@@ -461,7 +445,7 @@ function _pullArchivedEventsData() {
     catch (_) { return fallback; }
   }
 
-  return {
+  return _jsonResponse({
     events: data.map(function(row) {
       return {
         id:          row[0],
@@ -470,11 +454,7 @@ function _pullArchivedEventsData() {
         competitors: safeParse(row[3], [])
       };
     })
-  };
-}
-
-function _pullArchivedEvents() {
-  return _jsonResponse(_pullArchivedEventsData());
+  });
 }
 
 function _jsonResponse(obj) {
@@ -528,12 +508,8 @@ function _pushConfig(ss, config) {
   return _jsonResponse({ success: true });
 }
 
-function _pullConfigData() {
+function _pullConfig() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var syncUrl = _getConfig(ss, 'syncUrl');
-  return { syncUrl: syncUrl || '' };
-}
-
-function _pullConfig() {
-  return _jsonResponse(_pullConfigData());
+  return _jsonResponse({ syncUrl: syncUrl || '' });
 }
