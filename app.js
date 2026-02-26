@@ -207,6 +207,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (_adminPinResolve) { _adminPinResolve(false); _adminPinResolve = null; }
     });
 
+    $('admin-pin-cancel').addEventListener('click', () => {
+        $('admin-pin-modal').style.display = 'none';
+        if (_adminPinResolve) { _adminPinResolve(false); _adminPinResolve = null; }
+    });
+
     $('admin-pin-submit').addEventListener('click', () => {
         if (!hasAdminPin()) {
             // Setting up a new PIN
