@@ -51,6 +51,10 @@ function doGet(e) {
     return _pullConfig();
   }
 
+  if (action === 'pullArchivedEvents') {
+    return _pullArchivedEvents();
+  }
+
   return _jsonResponse({ status: 'ok', message: 'Stilly RNG sync endpoint is running' });
 }
 

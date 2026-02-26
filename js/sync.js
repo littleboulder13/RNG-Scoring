@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v86';
+const APP_VERSION = 'v87';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxl5_JrmYOV_oOW0COYUlGa_XrEFNT57CHJyTOznHQbO_FivjN_KYv2zkgqbD3N4nwz/exec';
 
 function getSyncUrl() {
@@ -110,46 +110,54 @@ async function autoSyncUrl() {
     }
 }
 
-/* --- Helper: POST to Apps Script via XHR (reliable on iOS PWAs) --- */
+/* --- Helper: POST to Apps Script via fetch (handles iOS cross-origin redirects) --- */
 function _postToAppsScript(payload, queryString) {
-    return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', getSyncUrl() + (queryString || ''));
-        xhr.setRequestHeader('Content-Type', 'text/plain');
-        xhr.onload = function () {
-            try { resolve(JSON.parse(xhr.responseText)); }
-            catch (_) { resolve({ _raw: xhr.responseText }); }
-        };
-        xhr.onerror = function () { reject(new Error('Network request failed')); };
-        xhr.ontimeout = function () { reject(new Error('Request timed out')); };
-        xhr.timeout = 30000;
-        xhr.send(JSON.stringify(payload));
+    const url = getSyncUrl() + (queryString || '');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+
+    return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload),
+        redirect: 'follow',
+        signal: controller.signal
+    })
+    .then(r => { clearTimeout(timer); return r.text(); })
+    .then(text => {
+        try { return JSON.parse(text); }
+        catch (_) { return { _raw: text }; }
+    })
+    .catch(err => {
+        clearTimeout(timer);
+        throw new Error(err.name === 'AbortError' ? 'Request timed out' : 'Network request failed: ' + err.message);
     });
 }
 
-/* --- Helper: Pull data from Apps Script via form-encoded POST --- */
-/* Form-encoded POST avoids CORS preflight AND puts form fields directly   */
-/* into e.parameter on the server, so e.parameter.action = 'pullEvents'.   */
+/* --- Helper: Pull data from Apps Script via fetch --- */
+/* Sends action in URL query string so it survives any POST→GET redirect.  */
+/* Also sends in body for doPost(e.parameter.action).                      */
 function _fetchFromAppsScript(action) {
-    return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        // Send action in BOTH URL query string and POST body.
-        // Google Apps Script redirects POST→GET, losing the body.
-        // The query parameter survives the redirect chain.
-        const url = getSyncUrl() + '?action=' + encodeURIComponent(action);
-        xhr.open('POST', url);
-        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-        xhr.onload = function () {
-            try {
-                resolve(JSON.parse(xhr.responseText));
-            } catch (_) {
-                reject(new Error('Invalid response: ' + xhr.responseText.substring(0, 200)));
-            }
-        };
-        xhr.onerror = function () { reject(new Error('Network request failed')); };
-        xhr.ontimeout = function () { reject(new Error('Request timed out')); };
-        xhr.timeout = 30000;
-        xhr.send('action=' + encodeURIComponent(action));
+    const url = getSyncUrl() + '?action=' + encodeURIComponent(action);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+
+    return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'action=' + encodeURIComponent(action),
+        redirect: 'follow',
+        signal: controller.signal
+    })
+    .then(r => { clearTimeout(timer); return r.text(); })
+    .then(text => {
+        try { return JSON.parse(text); }
+        catch (_) { throw new Error('Invalid response: ' + text.substring(0, 200)); }
+    })
+    .catch(err => {
+        clearTimeout(timer);
+        if (err.message && err.message.startsWith('Invalid response')) throw err;
+        throw new Error(err.name === 'AbortError' ? 'Request timed out' : 'Network request failed: ' + err.message);
     });
 }
 
@@ -158,6 +166,25 @@ function updateSyncStatus() {
     if (!badge) return;
     badge.textContent = '☁ Connected';
     badge.className = 'sync-status-badge connected';
+}
+
+/* --- Show a visible toast so user can see sync status on mobile --- */
+function showSyncToast(message, isError) {
+    let toast = $('sync-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'sync-toast';
+        toast.style.cssText = 'position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);' +
+            'padding:8px 18px;border-radius:8px;font-size:0.85rem;z-index:99999;' +
+            'transition:opacity 0.4s;pointer-events:none;font-weight:600;';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.style.background = isError ? '#c62828' : '#2e7d32';
+    toast.style.color = '#fff';
+    toast.style.opacity = '1';
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => { toast.style.opacity = '0'; }, 3000);
 }
 
 /* --- Push a single event's config (stages & competitors) to the cloud --- */
@@ -360,8 +387,10 @@ async function autoPullEvents() {
         }
 
         console.log('Auto-pull complete' + (changed ? ' (events updated)' : ' (no changes)'));
+        showSyncToast('✓ Synced with cloud' + (changed ? ' (updated)' : ''));
     } catch (err) {
         console.warn('Auto-pull events failed:', err.message);
+        showSyncToast('✗ Sync failed: ' + err.message, true);
     }
 }
 

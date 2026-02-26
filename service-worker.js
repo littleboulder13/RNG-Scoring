@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rng-scoring-v86';
+const CACHE_NAME = 'rng-scoring-v87';
 const urlsToCache = [
     './',
     './index.html',
@@ -30,8 +30,9 @@ self.addEventListener('install', (event) => {
 self.addEventListener('fetch', (event) => {
     const url = event.request.url;
 
-    // Don't intercept API calls
+    // Explicitly pass API calls through to network (don't cache)
     if (url.includes('script.google.com') || url.includes('googleusercontent.com')) {
+        event.respondWith(fetch(event.request));
         return;
     }
 

@@ -85,8 +85,12 @@ async function init() {
 // Service Worker Registration
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('service-worker.js')
-            .then(() => console.log('Service Worker registered'))
+        navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' })
+            .then(reg => {
+                console.log('Service Worker registered');
+                // Force update check on every load
+                reg.update().catch(() => {});
+            })
             .catch(err => console.error('SW registration failed:', err));
     });
 }
