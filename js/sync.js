@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v62';
+const APP_VERSION = 'v63';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbyCxJFGjMnnGU4WIJgC66ZAQkdBd-5OciDVOiTjAcR1fTJznDeqyJdi9ntzqyye_Rub/exec';
 
 function getSyncUrl() {
@@ -127,26 +127,39 @@ function _postToAppsScript(payload, queryString) {
     });
 }
 
-/* --- Helper: Pull data via XHR GET (hits doGet, no POST fallback) --- */
+/* --- Helper: Pull data from Apps Script --- */
+/* Try fetch GET (hits doGet). If CORS blocks it, fall back to POST with    */
+/* the action in the body (needs updated doPost to handle pull actions).    */
 function _fetchFromAppsScript(action) {
-    return new Promise((resolve, reject) => {
-        const url = getSyncUrl() + '?action=' + action + '&_t=' + Date.now();
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', url);
-        xhr.onload = function () {
-            try {
-                resolve(JSON.parse(xhr.responseText));
-            } catch (_) {
-                reject(new Error('Invalid JSON from server: ' + xhr.responseText.substring(0, 200)));
+    const url = getSyncUrl() + '?action=' + action + '&_t=' + Date.now();
+
+    return fetch(url)
+        .then(r => r.text())
+        .then(text => {
+            try { return JSON.parse(text); }
+            catch (_) { throw new Error('Non-JSON: ' + text.substring(0, 200)); }
+        })
+        .catch(fetchErr => {
+            console.warn('fetch GET failed (' + fetchErr.message + ') — falling back to POST');
+            return _postToAppsScript({ action: action });
+        })
+        .then(data => {
+            // Detect old Apps Script that doesn't handle pull via POST
+            if (data && data.error === 'No scores provided') {
+                throw new Error(
+                    'Your Google Apps Script deployment is out of date.\n\n' +
+                    'To fix:\n' +
+                    '1. Open your Apps Script project\n' +
+                    '2. Replace ALL the code with the latest google-apps-script.js\n' +
+                    '3. Click Deploy → Manage deployments\n' +
+                    '4. Click the pencil ✏️ icon to edit\n' +
+                    '5. Change Version to "New version"\n' +
+                    '6. Click Deploy\n\n' +
+                    '(The version dropdown is the key step most people miss!)'
+                );
             }
-        };
-        xhr.onerror = function () {
-            reject(new Error('Network request failed (XHR GET). status=' + xhr.status));
-        };
-        xhr.ontimeout = function () { reject(new Error('Request timed out')); };
-        xhr.timeout = 30000;
-        xhr.send();
-    });
+            return data;
+        });
 }
 
 function updateSyncStatus() {
