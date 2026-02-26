@@ -211,8 +211,10 @@ async function pullEvents() {
     try {
         const data = await _postToAppsScript({ action: 'pullEvents' });
 
+        // Debug: show raw response if no events found
         if (!data.events || !data.events.length) {
-            alert('No events found in the cloud yet.');
+            const raw = JSON.stringify(data).substring(0, 300);
+            alert('No events found in the cloud.\n\nServer response:\n' + raw);
             return;
         }
 
