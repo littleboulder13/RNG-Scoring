@@ -549,6 +549,14 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Wait time warning (> 30 minutes)
+        const waitMinutes = (parseInt($('wait-time-min').value) || 0);
+        const waitSeconds = (parseInt($('wait-time-sec').value) || 0);
+        const totalWaitMin = waitMinutes + waitSeconds / 60;
+        if (totalWaitMin > 30) {
+            if (!confirm(`Wait time is over 30 minutes (${waitMinutes}m ${waitSeconds}s).\n\nAre you sure this is correct?`)) return;
+        }
+
         $('form-error').style.display = 'none';
 
         const playerName = $('player-name').value;
