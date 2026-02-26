@@ -66,20 +66,7 @@ async function init() {
     window.addEventListener('offline', updateOnlineStatus);
     window.addEventListener('online', async () => {
         if (getSyncUrl() && (await getPendingScores()).length) setTimeout(syncScores, 1000);
-        // Auto-pull latest events when reconnecting, then push local changes
-        setTimeout(() => autoPullEvents().then(() => autoPushAllEvents()), 1500);
     });
-
-    // Auto-sync the Apps Script URL from the cloud
-    autoSyncUrl();
-
-    // Auto-pull latest events from the cloud on startup
-    autoPullEvents().then(() => autoPushAllEvents());
-
-    // Periodic auto-pull every 2 minutes to stay in sync
-    setInterval(() => {
-        if (navigator.onLine) autoPullEvents();
-    }, 2 * 60 * 1000);
 }
 
 // Service Worker Registration
@@ -102,8 +89,6 @@ function showEventOverlay() {
     renderEventOverlay();
     $('event-overlay').style.display = 'flex';
     $('active-event-bar').style.display = 'none';
-    // Auto-pull latest events from the cloud
-    autoPullEvents();
 }
 
 function hideEventOverlay() {

@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v95';
+const APP_VERSION = 'v96';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxl5_JrmYOV_oOW0COYUlGa_XrEFNT57CHJyTOznHQbO_FivjN_KYv2zkgqbD3N4nwz/exec';
 
 function getSyncUrl() {
@@ -93,24 +93,7 @@ function promptSyncUrl() {
     openSettingsModal();
 }
 
-/* --- Auto-sync URL on app load --- */
-async function autoSyncUrl() {
-    if (!navigator.onLine) return;
-    try {
-        const data = await _fetchFromAppsScript('pullConfig');
-        if (data && data.syncUrl && data.syncUrl.startsWith('https://script.google.com/')) {
-            const current = getSyncUrl();
-            if (data.syncUrl !== current) {
-                setSyncUrl(data.syncUrl);
-                console.log('Sync URL auto-updated from cloud:', data.syncUrl);
-            }
-        }
-    } catch (err) {
-        console.warn('Auto-sync URL check failed:', err.message);
-    }
-}
-
-/* --- Helper: POST to Apps Script via XHR (reliable on iOS PWAs) --- */
+/* --- Helper: POST to Apps Script via XHR --- */
 function _postToAppsScript(payload, queryString) {
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -131,183 +114,23 @@ function _postToAppsScript(payload, queryString) {
     });
 }
 
-/* --- Helper: Pull data from Apps Script --- */
-/* Tries 3 methods in order (all bypass different iOS restrictions):        */
-/*   1. iframe+postMessage (bypasses CORS, cookies, tracking)               */
-/*   2. JSONP (bypasses CORS via script tag)                                */
-/*   3. XHR GET (works on desktop)                                          */
+/* --- Helper: Fetch from Apps Script via XHR POST --- */
+/* POST with action in query string — Google's redirect preserves it. */
 function _fetchFromAppsScript(action) {
-    return _iframeFetch(action)
-        .catch(() => _jsonpFetch(action))
-        .catch(() => _xhrFetch(action));
-}
-
-function _iframeFetch(action) {
-    return new Promise((resolve, reject) => {
-        const iframe = document.createElement('iframe');
-        iframe.style.cssText = 'display:none;width:0;height:0;border:0;';
-        let done = false;
-
-        const timer = setTimeout(() => {
-            if (done) return;
-            done = true; cleanup();
-            reject(new Error('iframe timeout'));
-        }, 12000);
-
-        function cleanup() {
-            clearTimeout(timer);
-            window.removeEventListener('message', onMessage);
-            if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-        }
-
-        function onMessage(e) {
-            // Accept messages from Google domains only
-            if (!e.origin || !e.origin.includes('google')) return;
-            if (done) return;
-            done = true; cleanup();
-            try {
-                resolve(JSON.parse(e.data));
-            } catch (_) {
-                reject(new Error('Invalid iframe data'));
-            }
-        }
-
-        window.addEventListener('message', onMessage);
-        iframe.src = getSyncUrl() + '?action=' + encodeURIComponent(action) + '&mode=iframe';
-        document.body.appendChild(iframe);
-    });
-}
-
-function _jsonpFetch(action) {
-    return new Promise((resolve, reject) => {
-        const cbName = '_rngcb_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
-        const url = getSyncUrl() + '?action=' + encodeURIComponent(action) + '&callback=' + cbName;
-        const script = document.createElement('script');
-        let done = false;
-
-        const timer = setTimeout(() => {
-            if (done) return;
-            done = true; cleanup();
-            reject(new Error('JSONP timeout'));
-        }, 8000);
-
-        function cleanup() {
-            clearTimeout(timer);
-            delete window[cbName];
-            if (script.parentNode) script.parentNode.removeChild(script);
-        }
-
-        window[cbName] = function(data) {
-            if (done) return;
-            done = true; cleanup();
-            resolve(data);
-        };
-
-        script.onerror = function() {
-            if (done) return;
-            done = true; cleanup();
-            reject(new Error('JSONP script failed'));
-        };
-
-        script.src = url;
-        document.head.appendChild(script);
-    });
-}
-
-function _xhrFetch(action) {
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         const url = getSyncUrl() + '?action=' + encodeURIComponent(action);
-        xhr.open('GET', url);
+        xhr.open('POST', url);
+        xhr.setRequestHeader('Content-Type', 'text/plain');
         xhr.onload = function () {
-            if (xhr.status >= 400) {
-                reject(new Error('HTTP ' + xhr.status));
-                return;
-            }
             try { resolve(JSON.parse(xhr.responseText)); }
-            catch (_) { reject(new Error('Invalid JSON')); }
+            catch (_) { reject(new Error('Invalid response')); }
         };
-        xhr.onerror = function () { reject(new Error('XHR onerror (status=' + xhr.status + ')')); };
-        xhr.ontimeout = function () { reject(new Error('XHR timeout')); };
-        xhr.timeout = 10000;
-        xhr.send();
+        xhr.onerror = function () { reject(new Error('Network request failed')); };
+        xhr.ontimeout = function () { reject(new Error('Request timed out')); };
+        xhr.timeout = 30000;
+        xhr.send(JSON.stringify({ action: action }));
     });
-}
-
-/* --- Manual Pull from Cloud — step-by-step diagnostic --- */
-async function manualPullFromCloud() {
-    const btn = $('pull-cloud-btn');
-    const status = $('pull-status');
-    if (btn) btn.disabled = true;
-
-    function log(msg, color) {
-        if (status) { status.innerHTML = msg; status.style.color = color || '#aaa'; }
-    }
-
-    const errors = [];
-
-    // Step 1: iframe+postMessage (most reliable on iOS)
-    log('1/3: Trying iframe…');
-    try {
-        const data = await _iframeFetch('pullEvents');
-        log('✓ iframe succeeded!', '#4f4');
-        return handlePullData(data, status, btn);
-    } catch (e) { errors.push('iframe: ' + e.message); }
-
-    // Step 2: JSONP
-    log(errors[0] + '<br>2/3: Trying JSONP…', '#fa0');
-    try {
-        const data = await _jsonpFetch('pullEvents');
-        log('✓ JSONP succeeded!', '#4f4');
-        return handlePullData(data, status, btn);
-    } catch (e) { errors.push('JSONP: ' + e.message); }
-
-    // Step 3: XHR
-    log(errors.join('<br>') + '<br>3/3: Trying XHR…', '#fa0');
-    try {
-        const data = await _xhrFetch('pullEvents');
-        log('✓ XHR succeeded!', '#4f4');
-        return handlePullData(data, status, btn);
-    } catch (e) { errors.push('XHR: ' + e.message); }
-
-    // All failed
-    log('✗ All 3 methods failed:<br>' + errors.join('<br>') +
-        '<br><br>⚠ Redeploy Apps Script &amp; check Safari settings:<br>' +
-        '<span style="font-size:0.65rem;color:#999;">Settings → Safari → turn OFF "Prevent Cross-Site Tracking" &amp; "Block All Cookies"</span>', '#f44');
-    showSyncToast('✗ Pull failed', true);
-    if (btn) btn.disabled = false;
-}
-
-function handlePullData(data, statusEl, btn) {
-    if (!data || !Array.isArray(data.events)) {
-        const raw = JSON.stringify(data).substring(0, 300);
-        if (statusEl) { statusEl.textContent = '✗ Bad response: ' + raw; statusEl.style.color = '#f44'; }
-        if (btn) btn.disabled = false;
-        return;
-    }
-
-    // Merge into local storage (cloud is source of truth)
-    const local = getEvents();
-    const cloudIds = new Set(data.events.map(e => e.id));
-    const merged = local.filter(e => cloudIds.has(e.id));
-
-    for (const remote of data.events) {
-        const idx = merged.findIndex(e => e.id === remote.id);
-        if (idx === -1) {
-            merged.push(remote);
-        } else {
-            merged[idx].name = remote.name;
-            merged[idx].stages = remote.stages;
-            merged[idx].competitors = remote.competitors;
-            merged[idx].password = remote.password || '';
-        }
-    }
-
-    saveEvents(merged);
-    renderEventOverlay();
-    if (statusEl) { statusEl.textContent = '✓ Got ' + data.events.length + ' event(s)'; statusEl.style.color = '#4f4'; }
-    showSyncToast('✓ Pulled ' + data.events.length + ' event(s)');
-    if (btn) btn.disabled = false;
 }
 
 function updateSyncStatus() {
@@ -315,25 +138,6 @@ function updateSyncStatus() {
     if (!badge) return;
     badge.textContent = '☁ Connected';
     badge.className = 'sync-status-badge connected';
-}
-
-/* --- Show a visible toast so user can see sync status on mobile --- */
-function showSyncToast(message, isError) {
-    let toast = $('sync-toast');
-    if (!toast) {
-        toast = document.createElement('div');
-        toast.id = 'sync-toast';
-        toast.style.cssText = 'position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);' +
-            'padding:8px 18px;border-radius:8px;font-size:0.85rem;z-index:99999;' +
-            'transition:opacity 0.4s;pointer-events:none;font-weight:600;';
-        document.body.appendChild(toast);
-    }
-    toast.textContent = message;
-    toast.style.background = isError ? '#c62828' : '#2e7d32';
-    toast.style.color = '#fff';
-    toast.style.opacity = '1';
-    clearTimeout(toast._timer);
-    toast._timer = setTimeout(() => { toast.style.opacity = '0'; }, 3000);
 }
 
 /* --- Push a single event's config (stages & competitors) to the cloud --- */
@@ -420,131 +224,6 @@ async function pushAllEvents() {
     if (pushBtn) { pushBtn.disabled = false; pushBtn.textContent = '\u2B06 Push Events to Cloud'; }
 }
 
-/* --- Silent auto-push: push all local events to cloud without alerts --- */
-async function autoPushAllEvents() {
-    if (!navigator.onLine) return;
-    const events = getEvents();
-    if (!events.length) return;
-
-    for (const ev of events) {
-        try {
-            await _postToAppsScript({ action: 'pushEvent', event: ev });
-        } catch (err) {
-            console.warn('Auto-push failed for', ev.name, ':', err.message);
-        }
-    }
-    console.log('Auto-push complete:', events.length, 'event(s)');
-}
-
-/* --- Silent auto-pull: merge cloud events without user alerts --- */
-async function autoPullEvents() {
-    if (!navigator.onLine) return;
-    try {
-        const data = await _fetchFromAppsScript('pullEvents');
-
-        // Validate the response looks like an events response
-        if (!data || !Array.isArray(data.events)) {
-            const raw = JSON.stringify(data).substring(0, 100);
-            console.warn('Auto-pull: unexpected response:', raw);
-            showSyncToast('✗ Bad response: ' + raw, true);
-            return;
-        }
-
-        const cloudEvents = data.events;
-        const local = getEvents();
-        let changed = false;
-
-        // Cloud is source of truth — build a set of cloud event IDs
-        const cloudIds = new Set(cloudEvents.map(e => e.id));
-
-        // Remove local events that no longer exist in the cloud
-        const filtered = local.filter(e => {
-            if (!cloudIds.has(e.id)) { changed = true; return false; }
-            return true;
-        });
-
-        // Add or update events from cloud
-        for (const remote of cloudEvents) {
-            const idx = filtered.findIndex(e => e.id === remote.id);
-            if (idx === -1) {
-                filtered.push(remote);
-                changed = true;
-            } else {
-                // Update if remote has newer data (including password)
-                if (filtered[idx].name !== remote.name ||
-                    filtered[idx].password !== (remote.password || '') ||
-                    JSON.stringify(filtered[idx].stages) !== JSON.stringify(remote.stages) ||
-                    JSON.stringify(filtered[idx].competitors) !== JSON.stringify(remote.competitors)) {
-                    filtered[idx].name = remote.name;
-                    filtered[idx].stages = remote.stages;
-                    filtered[idx].competitors = remote.competitors;
-                    filtered[idx].password = remote.password || '';
-                    changed = true;
-                }
-            }
-        }
-
-        if (changed) {
-            saveEvents(filtered);
-
-            // Clear active event if it was removed from the cloud
-            const activeId = getActiveEventId();
-            if (activeId && !cloudIds.has(activeId)) {
-                clearActiveEvent();
-            }
-        }
-
-        // Also pull archived events silently — cloud is source of truth
-        try {
-            const archiveData = await _fetchFromAppsScript('pullArchivedEvents');
-            const cloudArchived = (archiveData && archiveData.events) ? archiveData.events : [];
-            const localArchived = getArchivedEvents();
-
-            const cloudArchiveIds = new Set(cloudArchived.map(e => e.id));
-            let archiveChanged = false;
-
-            // Remove local archived events not in cloud
-            const filteredArchived = localArchived.filter(e => {
-                if (!cloudArchiveIds.has(e.id)) { archiveChanged = true; return false; }
-                return true;
-            });
-
-            // Add new archived events from cloud
-            for (const remote of cloudArchived) {
-                if (!filteredArchived.find(e => e.id === remote.id)) {
-                    filteredArchived.push(remote);
-                    archiveChanged = true;
-                }
-            }
-
-            if (archiveChanged) {
-                saveArchivedEvents(filteredArchived);
-                changed = true;
-            }
-        } catch (_) { /* ignore archive pull errors silently */ }
-
-        // Re-render overlay if it's currently visible
-        if (changed) {
-            const overlay = $('event-overlay');
-            if (overlay && overlay.style.display !== 'none') {
-                renderEventOverlay();
-            }
-            // Also refresh main UI if active event was updated
-            if (getActiveEvent()) {
-                populatePlayerDropdown();
-                populateStageDropdown();
-                showStageInfo();
-            }
-        }
-
-        console.log('Auto-pull complete' + (changed ? ' (events updated)' : ' (no changes)'));
-        showSyncToast('✓ Synced with cloud' + (changed ? ' (updated)' : ''));
-    } catch (err) {
-        console.warn('Auto-pull events failed:', err.message);
-        showSyncToast('✗ Sync failed: ' + err.message, true);
-    }
-}
-
 /* --- Pull all events from the cloud and merge into localStorage --- */
 async function pullEvents() {
     if (!navigator.onLine) return alert('Cannot pull events while offline.');
@@ -558,7 +237,7 @@ async function pullEvents() {
         // Debug: show raw response if no events found
         if (!data.events || !data.events.length) {
             const raw = JSON.stringify(data).substring(0, 300);
-            alert('App ' + APP_VERSION + ' | Method: XHR GET\n\nNo events found.\n\nServer response:\n' + raw);
+            alert('App ' + APP_VERSION + ' | Method: XHR POST\n\nNo events found.\n\nServer response:\n' + raw);
             return;
         }
 
