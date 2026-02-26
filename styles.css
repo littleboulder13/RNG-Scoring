@@ -790,6 +790,15 @@ button {
     z-index: 10;
 }
 
+.overlay-admin {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    color: #555;
+    font-size: 1.6rem;
+    z-index: 10;
+}
+
 /* --- Settings Modal --- */
 .modal-overlay {
     position: fixed;
