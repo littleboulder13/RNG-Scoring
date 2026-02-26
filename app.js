@@ -243,7 +243,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const event = createEvent(name);
         pushEventConfig(event.id);
         $('new-event-name').value = '';
-        selectEvent(event.id);
+        renderEventOverlay();
+        openEventEditor(event.id);
     });
 
     // --- Event overlay: Select / Edit / Delete (delegated) ---
