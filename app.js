@@ -157,28 +157,83 @@ document.addEventListener('DOMContentLoaded', () => {
         banner.style.display = 'flex';
     }
 
-    // --- Event overlay: Create event (admin PIN required) ---
-    $('create-event-btn').addEventListener('click', () => {
-        // Ensure admin PIN is set
+    // --- Reusable admin PIN prompt via HTML modal ---
+    let _adminPinResolve = null;
+
+    function requestAdminPin(actionLabel) {
+        return new Promise((resolve) => {
+            _adminPinResolve = resolve;
+            const modal = $('admin-pin-modal');
+            const setupDiv = $('admin-pin-setup');
+            const pinInput = $('admin-pin-input');
+            const newPinInput = $('admin-pin-new');
+
+            $('admin-pin-title').textContent = actionLabel
+                ? 'PIN required to ' + actionLabel
+                : 'Enter Admin PIN';
+            $('admin-pin-error').style.display = 'none';
+            pinInput.value = '';
+            newPinInput.value = '';
+
+            if (!hasAdminPin()) {
+                // No PIN set — show setup fields
+                pinInput.style.display = 'none';
+                setupDiv.style.display = '';
+            } else {
+                pinInput.style.display = '';
+                setupDiv.style.display = 'none';
+            }
+
+            modal.style.display = 'flex';
+            (hasAdminPin() ? pinInput : newPinInput).focus();
+        });
+    }
+
+    $('admin-pin-close').addEventListener('click', () => {
+        $('admin-pin-modal').style.display = 'none';
+        if (_adminPinResolve) { _adminPinResolve(false); _adminPinResolve = null; }
+    });
+
+    $('admin-pin-submit').addEventListener('click', () => {
         if (!hasAdminPin()) {
-            const newPin = prompt('Set up your admin PIN.\n\nThis PIN will be required to create events and manage stages:');
-            if (!newPin || !newPin.trim()) { alert('Admin PIN is required.'); return; }
-            setAdminPin(newPin.trim());
-            alert('Admin PIN saved! Remember this PIN.');
+            // Setting up a new PIN
+            const newPin = ($('admin-pin-new').value || '').trim();
+            if (!newPin) {
+                $('admin-pin-error').textContent = 'PIN cannot be empty.';
+                $('admin-pin-error').style.display = 'block';
+                return;
+            }
+            setAdminPin(newPin);
+            $('admin-pin-modal').style.display = 'none';
+            if (_adminPinResolve) { _adminPinResolve(true); _adminPinResolve = null; }
         } else {
-            if (!promptAdminPin('create an event')) return;
+            // Verifying existing PIN
+            const entered = $('admin-pin-input').value;
+            if (verifyAdminPin(entered)) {
+                $('admin-pin-modal').style.display = 'none';
+                if (_adminPinResolve) { _adminPinResolve(true); _adminPinResolve = null; }
+            } else {
+                $('admin-pin-error').textContent = 'Incorrect PIN.';
+                $('admin-pin-error').style.display = 'block';
+            }
         }
+    });
+
+    // --- Event overlay: Create event (admin PIN required) ---
+    $('create-event-btn').addEventListener('click', async () => {
+        const ok = await requestAdminPin('create an event');
+        if (!ok) return;
 
         const name = $('new-event-name').value.trim();
         if (!name) { alert('Please enter an event name.'); return; }
         const event = createEvent(name);
-        pushEventConfig(event.id);  // sync to cloud
+        pushEventConfig(event.id);
         $('new-event-name').value = '';
         selectEvent(event.id);
     });
 
     // --- Event overlay: Select / Edit / Delete (delegated) ---
-    $('event-cards').addEventListener('click', (e) => {
+    $('event-cards').addEventListener('click', async (e) => {
         const selectBtn = e.target.closest('.btn-select-event');
         if (selectBtn) {
             selectEvent(selectBtn.dataset.id);
@@ -186,7 +241,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const editBtn = e.target.closest('.btn-edit-event');
         if (editBtn) {
-            if (hasAdminPin() && !promptAdminPin('edit this event')) return;
+            if (hasAdminPin()) {
+                const ok = await requestAdminPin('edit this event');
+                if (!ok) return;
+            }
             openEventEditor(editBtn.dataset.id);
             return;
         }
@@ -194,7 +252,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (deleteBtn) {
             const ev = getEvents().find(ev => ev.id === deleteBtn.dataset.id);
             if (!ev) return;
-            if (hasAdminPin() && !promptAdminPin('delete this event')) return;
+            if (hasAdminPin()) {
+                const ok = await requestAdminPin('delete this event');
+                if (!ok) return;
+            }
             if (!confirm(`Delete "${ev.name}"?\n\nThis removes the event and its stages/competitors. Scores in the database are kept.`)) return;
             deleteEvent(ev.id);
             renderEventOverlay();
