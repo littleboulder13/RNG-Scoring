@@ -126,20 +126,26 @@ function _postToAppsScript(payload, queryString) {
     });
 }
 
-/* --- Helper: Fetch data from Apps Script (GET via fetch, POST fallback) --- */
+/* --- Helper: Pull data via XHR GET (hits doGet, no POST fallback) --- */
 function _fetchFromAppsScript(action) {
-    const url = getSyncUrl() + '?action=' + action + '&_t=' + Date.now();
-
-    // Try fetch GET first (works on Chrome, may fail on iOS PWA)
-    return fetch(url, { redirect: 'follow' })
-        .then(r => {
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            return r.json();
-        })
-        .catch(() => {
-            // Fallback: POST with action in query string
-            return _postToAppsScript({}, '?action=' + action);
-        });
+    return new Promise((resolve, reject) => {
+        const url = getSyncUrl() + '?action=' + action + '&_t=' + Date.now();
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', url);
+        xhr.onload = function () {
+            try {
+                resolve(JSON.parse(xhr.responseText));
+            } catch (_) {
+                reject(new Error('Invalid JSON from server: ' + xhr.responseText.substring(0, 200)));
+            }
+        };
+        xhr.onerror = function () {
+            reject(new Error('Network request failed (XHR GET). status=' + xhr.status));
+        };
+        xhr.ontimeout = function () { reject(new Error('Request timed out')); };
+        xhr.timeout = 30000;
+        xhr.send();
+    });
 }
 
 function updateSyncStatus() {
