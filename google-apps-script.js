@@ -264,6 +264,13 @@ function _pullEvents() {
     colIdx[String(headers[c]).toLowerCase().replace(/\s+/g, '')] = c;
   }
 
+  // Safe JSON parse helper — returns fallback if value isn't valid JSON
+  function safeParse(val, fallback) {
+    if (!val || typeof val !== 'string') return fallback;
+    try { return JSON.parse(val); }
+    catch (_) { return fallback; }
+  }
+
   var events = data.map(function(row) {
     var idCol   = colIdx['eventid'] !== undefined ? colIdx['eventid'] : 0;
     var nameCol = colIdx['name'] !== undefined ? colIdx['name'] : 1;
@@ -274,8 +281,8 @@ function _pullEvents() {
     return {
       id:          row[idCol],
       name:        row[nameCol],
-      stages:      JSON.parse(row[stagesCol] || '[]'),
-      competitors: JSON.parse(row[compCol] || '[]')
+      stages:      safeParse(row[stagesCol], []),
+      competitors: safeParse(row[compCol], [])
     };
   });
 
