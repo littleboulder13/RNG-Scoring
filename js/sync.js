@@ -114,22 +114,25 @@ function _postToAppsScript(payload, queryString) {
     });
 }
 
-/* --- Helper: Fetch from Apps Script via XHR POST --- */
-/* POST with action in query string — Google's redirect preserves it. */
+/* --- Helper: Pull data from Apps Script via form-encoded POST --- */
+/* Form-encoded POST avoids CORS preflight AND puts form fields directly   */
+/* into e.parameter on the server, so e.parameter.action = 'pullEvents'.   */
 function _fetchFromAppsScript(action) {
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        const url = getSyncUrl() + '?action=' + encodeURIComponent(action);
-        xhr.open('POST', url);
-        xhr.setRequestHeader('Content-Type', 'text/plain');
+        xhr.open('POST', getSyncUrl());
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
         xhr.onload = function () {
-            try { resolve(JSON.parse(xhr.responseText)); }
-            catch (_) { reject(new Error('Invalid response')); }
+            try {
+                resolve(JSON.parse(xhr.responseText));
+            } catch (_) {
+                reject(new Error('Invalid response'));
+            }
         };
         xhr.onerror = function () { reject(new Error('Network request failed')); };
         xhr.ontimeout = function () { reject(new Error('Request timed out')); };
         xhr.timeout = 30000;
-        xhr.send(JSON.stringify({ action: action }));
+        xhr.send('action=' + encodeURIComponent(action));
     });
 }
 
