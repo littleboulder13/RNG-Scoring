@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v97';
+const APP_VERSION = 'v98';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxDwug8yxfGbuqVKWUb7WTZh89NJQzp5ZaIIC3aPs4w4iiWogk0Yvg7M9ASgy70NOkW/exec';
 
 function getSyncUrl() {
@@ -192,41 +192,6 @@ async function pushPermanentlyDeleteEvent(eventId, event) {
     } catch (err) {
         console.warn('Permanent delete push failed:', err.message);
     }
-}
-
-/* --- Push ALL local events to the cloud --- */
-async function pushAllEvents() {
-    if (!navigator.onLine) return alert('Cannot push events while offline.');
-
-    const events = getEvents();
-    if (!events.length) return alert('No local events to push.');
-
-    const pushBtn = $('push-events-btn');
-    if (pushBtn) { pushBtn.disabled = true; pushBtn.textContent = 'Pushing\u2026'; }
-
-    let success = 0, failed = 0;
-    for (const ev of events) {
-        try {
-            const result = await _postToAppsScript({ action: 'pushEvent', event: ev });
-            if (result && result.success) {
-                success++;
-            } else {
-                failed++;
-                console.warn('Push failed for', ev.name, ':', JSON.stringify(result).substring(0, 200));
-            }
-        } catch (err) {
-            failed++;
-            console.warn('Push error for', ev.name, ':', err.message);
-        }
-    }
-
-    if (failed === 0) {
-        alert(`\u2713 Pushed ${success} event(s) to the cloud!`);
-    } else {
-        alert(`Pushed ${success}, failed ${failed}.\n\nApp: ${APP_VERSION}\nOnline: ${navigator.onLine}\nStandalone: ${window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches}\n\nTry opening in Safari (not the app) to sync.`);
-    }
-
-    if (pushBtn) { pushBtn.disabled = false; pushBtn.textContent = '\u2B06 Push Events to Cloud'; }
 }
 
 /* --- Pull all events from the cloud and merge into localStorage --- */

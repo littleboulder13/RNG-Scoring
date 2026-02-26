@@ -324,8 +324,8 @@ document.addEventListener('DOMContentLoaded', () => {
         saveEventEditorFields();
         const wasEditingId = editingEventId;
         closeEventEditor();
-        // Push changes to cloud even when closing with X
-        if (wasEditingId) pushEventConfig(wasEditingId);
+        // Auto-push changes to cloud (admin only)
+        if (wasEditingId && isAdminLoggedIn()) pushEventConfig(wasEditingId);
         if (wasEditingId === getActiveEventId()) {
             refreshAfterEventChange();
         }
@@ -334,8 +334,8 @@ document.addEventListener('DOMContentLoaded', () => {
         saveEventEditorFields();
         const wasEditingId = editingEventId;
         closeEventEditor();
-        // Push updated event to cloud
-        if (wasEditingId) pushEventConfig(wasEditingId);
+        // Auto-push updated event to cloud (admin only)
+        if (wasEditingId && isAdminLoggedIn()) pushEventConfig(wasEditingId);
         // If this event is the active one, refresh the main UI
         if (wasEditingId === getActiveEventId()) {
             refreshAfterEventChange();
