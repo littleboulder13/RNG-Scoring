@@ -59,6 +59,21 @@ function markAsSynced(id) {
     });
 }
 
+async function deleteScoresByEventId(eventId) {
+    const scores = await getAllScores();
+    const toDelete = scores.filter(s => s.eventId === eventId);
+    if (!toDelete.length) return;
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        for (const score of toDelete) {
+            store.delete(score.id);
+        }
+        tx.oncomplete = () => resolve(toDelete.length);
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
 async function migrateScoresToEvent(eventId) {
     const scores = await getAllScores();
     const toMigrate = scores.filter(s => !s.eventId);

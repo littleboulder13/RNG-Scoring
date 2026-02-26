@@ -289,9 +289,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const archived = getArchivedEvents();
             const ev = archived.find(a => a.id === permDeleteBtn.dataset.id);
             if (!ev) return;
-            if (!confirm(`Permanently delete "${ev.name}"?\n\nThis cannot be undone.`)) return;
+            if (!confirm(`Permanently delete "${ev.name}"?\n\nThis will also delete all scores for this event.\n\nThis cannot be undone.`)) return;
             permanentlyDeleteEvent(ev.id);
-            pushPermanentlyDeleteEvent(ev.id);
+            await deleteScoresByEventId(ev.id);
+            pushPermanentlyDeleteEvent(ev.id, ev);
             renderEventOverlay();
         }
     });

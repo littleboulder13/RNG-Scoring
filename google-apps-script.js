@@ -30,7 +30,7 @@ function doPost(e) {
     if (action === 'pullConfig') return _pullConfig();
     if (action === 'archiveEvent') return _archiveEvent(ss, data.eventId);
     if (action === 'restoreEvent') return _restoreEvent(ss, data.eventId);
-    if (action === 'permanentlyDeleteEvent') return _permanentlyDeleteEvent(ss, data.eventId);
+    if (action === 'permanentlyDeleteEvent') return _permanentlyDeleteEvent(ss, data.eventId, data.eventName, data.stages);
 
     // Default: syncScores
     return _syncScores(ss, data);
@@ -378,7 +378,7 @@ function _restoreEvent(ss, eventId) {
 }
 
 /* --- Permanently Delete Archived Event --- */
-function _permanentlyDeleteEvent(ss, eventId) {
+function _permanentlyDeleteEvent(ss, eventId, eventName, stageNames) {
   if (!eventId) return _jsonResponse({ success: false, error: 'No eventId' });
 
   var archiveSheet = ss.getSheetByName('ArchivedEvents');
@@ -386,15 +386,40 @@ function _permanentlyDeleteEvent(ss, eventId) {
     return _jsonResponse({ success: false, error: 'ArchivedEvents sheet not found or empty' });
   }
 
+  // If eventName not provided, read it from the archive row
   var values = archiveSheet.getDataRange().getValues();
+  var rowToDelete = -1;
   for (var r = 1; r < values.length; r++) {
     if (values[r][0] === eventId) {
-      archiveSheet.deleteRow(r + 1);
-      return _jsonResponse({ success: true, eventId: eventId });
+      rowToDelete = r + 1;
+      if (!eventName) eventName = values[r][1];
+      if (!stageNames || !stageNames.length) {
+        try { stageNames = JSON.parse(values[r][2]).map(function(s) { return s.name || s; }); }
+        catch (_) { stageNames = []; }
+      }
+      break;
     }
   }
 
-  return _jsonResponse({ success: false, error: 'Archived event not found' });
+  if (rowToDelete === -1) return _jsonResponse({ success: false, error: 'Archived event not found' });
+
+  // Delete score tabs for this event ("EventName - StageName")
+  var deletedTabs = [];
+  if (eventName && stageNames && stageNames.length) {
+    for (var i = 0; i < stageNames.length; i++) {
+      var tabName = (eventName + ' - ' + stageNames[i]).substring(0, 100);
+      var scoreSheet = ss.getSheetByName(tabName);
+      if (scoreSheet) {
+        ss.deleteSheet(scoreSheet);
+        deletedTabs.push(tabName);
+      }
+    }
+  }
+
+  // Delete the archived event row
+  archiveSheet.deleteRow(rowToDelete);
+
+  return _jsonResponse({ success: true, eventId: eventId, deletedTabs: deletedTabs });
 }
 
 /* --- Pull Archived Events --- */

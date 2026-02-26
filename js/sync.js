@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v78';
+const APP_VERSION = 'v79';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxl5_JrmYOV_oOW0COYUlGa_XrEFNT57CHJyTOznHQbO_FivjN_KYv2zkgqbD3N4nwz/exec';
 
 function getSyncUrl() {
@@ -191,10 +191,15 @@ async function pushRestoreEvent(eventId) {
     }
 }
 
-async function pushPermanentlyDeleteEvent(eventId) {
+async function pushPermanentlyDeleteEvent(eventId, event) {
     if (!navigator.onLine) return;
     try {
-        await _postToAppsScript({ action: 'permanentlyDeleteEvent', eventId });
+        var payload = { action: 'permanentlyDeleteEvent', eventId: eventId };
+        if (event) {
+            payload.eventName = event.name || '';
+            payload.stages = (event.stages || []).map(function(s) { return s.name || s; });
+        }
+        await _postToAppsScript(payload);
     } catch (err) {
         console.warn('Permanent delete push failed:', err.message);
     }
