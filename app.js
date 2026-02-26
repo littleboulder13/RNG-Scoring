@@ -368,6 +368,17 @@ document.addEventListener('DOMContentLoaded', () => {
             err.style.display = 'block';
             return;
         }
+
+        // Par time validation (only when not DNF)
+        const shootTime = parseFloat($('time').value);
+        const stagePar  = stage?.par !== '' && stage?.par != null ? parseFloat(stage.par) : NaN;
+        if (!$('dnf').checked && !isNaN(stagePar) && stagePar > 0 && shootTime > stagePar) {
+            const err = $('form-error');
+            err.textContent = 'Shoot time is greater than stage par time.';
+            err.style.display = 'block';
+            return;
+        }
+
         $('form-error').style.display = 'none';
 
         const playerName = $('player-name').value;
