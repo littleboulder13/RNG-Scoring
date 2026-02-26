@@ -64,6 +64,8 @@ function doGet(e) {
 }
 
 /* --- Score Sync (one tab per stage, all competitors listed) --- */
+/* If a competitor already has a score on a stage, new scores are   */
+/* placed in columns to the right instead of overwriting.          */
 function _syncScores(ss, data) {
   var scores = Array.isArray(data.scores) ? data.scores : [];
   var eventName = data.eventName || 'Unknown Event';
@@ -74,8 +76,9 @@ function _syncScores(ss, data) {
     return _jsonResponse({ success: false, error: 'No scores provided' });
   }
 
-  var headers = ['#', 'Shooter', 'Division', 'Time (s)', 'Wait Time (m:ss)',
-                 'Targets Not Neutralized', 'Notes'];
+  var BASE_HEADERS = ['#', 'Shooter', 'Division'];
+  var SCORE_HEADERS = ['Time (s)', 'Wait Time (m:ss)', 'Targets Not Neutralized', 'Notes'];
+  var SCORE_COLS = SCORE_HEADERS.length; // 4 columns per score block
 
   // Helper: format wait time
   function fmtWait(totalSec) {
@@ -116,45 +119,53 @@ function _syncScores(ss, data) {
       isNew = true;
     }
 
-    // Build score lookup: playerName → score (first occurrence wins)
     var stageScores = scoresByStage[stage] || [];
 
-    // Read existing scores already in the sheet (rows 2+)
+    // --- Read existing data (each shooter may already have multiple score blocks) ---
+    // existingMap: { shooterName: { division: '', scores: [{time,waitTime,tnt,notes}, ...] } }
     var existingMap = {};
     if (!isNew && sheet.getLastRow() >= 2) {
-      var existData = sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getValues();
+      var numCols = Math.max(sheet.getLastColumn(), BASE_HEADERS.length + SCORE_COLS);
+      var existData = sheet.getRange(2, 1, sheet.getLastRow() - 1, numCols).getValues();
       for (var ex = 0; ex < existData.length; ex++) {
         var exName = String(existData[ex][1]).trim();
-        if (exName && existData[ex][3] !== '') {
-          existingMap[exName] = {
-            time: existData[ex][3],
-            waitTime: existData[ex][4],
-            tnt: existData[ex][5],
-            notes: existData[ex][6]
-          };
+        if (!exName) continue;
+        var exScores = [];
+        // Walk score blocks (each starts at column index 3 + block * 4)
+        for (var b = 0; b < 50; b++) {
+          var off = BASE_HEADERS.length + b * SCORE_COLS;
+          if (off >= numCols) break;
+          var timeVal = existData[ex][off];
+          if (timeVal === '' || timeVal === undefined || timeVal === null) break;
+          exScores.push({
+            time: timeVal,
+            waitTime: existData[ex][off + 1] || '',
+            tnt: existData[ex][off + 2] || 0,
+            notes: existData[ex][off + 3] || ''
+          });
         }
+        existingMap[exName] = { division: existData[ex][2] || '', scores: exScores };
       }
     }
 
-    // Merge new scores into lookup (new scores overwrite)
-    var scoreMap = {};
-    // Start with existing
-    for (var ek in existingMap) { scoreMap[ek] = existingMap[ek]; }
-    // Overlay new scores
+    // --- Append new scores (never overwrite — add as new block to the right) ---
     for (var ns = 0; ns < stageScores.length; ns++) {
       var sc = stageScores[ns];
       var pn = sc.playerName || '';
-      if (pn) {
-        scoreMap[pn] = {
-          time: sc.dnf ? 'DNF' : (sc.time || 0),
-          waitTime: fmtWait(sc.waitTime),
-          tnt: sc.targetsNotNeutralized || 0,
-          notes: sc.notes || ''
-        };
+      if (!pn) continue;
+      var newScore = {
+        time: sc.dnf ? 'DNF' : (sc.time || 0),
+        waitTime: fmtWait(sc.waitTime),
+        tnt: sc.targetsNotNeutralized || 0,
+        notes: sc.notes || ''
+      };
+      if (!existingMap[pn]) {
+        existingMap[pn] = { division: sc.division || '', scores: [] };
       }
+      existingMap[pn].scores.push(newScore);
     }
 
-    // Build full competitor list (event competitors + anyone with scores)
+    // --- Build full competitor list (event competitors + anyone with scores) ---
     var compList = [];
     var compSet = {};
     for (var ci = 0; ci < competitors.length; ci++) {
@@ -164,40 +175,60 @@ function _syncScores(ss, data) {
         compSet[cn] = true;
       }
     }
-    // Add any scored players not in the competitor list
-    for (var sp in scoreMap) {
+    for (var sp in existingMap) {
       if (!compSet[sp]) {
-        compList.push({ name: sp, division: '' });
+        compList.push({ name: sp, division: existingMap[sp].division || '' });
         compSet[sp] = true;
       }
     }
 
-    // Build rows
-    var rows = [];
-    for (var ri = 0; ri < compList.length; ri++) {
-      var comp = compList[ri];
-      var s = scoreMap[comp.name];
-      if (s) {
-        rows.push([ri + 1, comp.name, comp.division, s.time, s.waitTime, s.tnt, s.notes]);
-      } else {
-        rows.push([ri + 1, comp.name, comp.division, '', '', '', '']);
+    // --- Determine the max number of score blocks across all shooters ---
+    var maxBlocks = 1;
+    for (var mb in existingMap) {
+      if (existingMap[mb].scores.length > maxBlocks) {
+        maxBlocks = existingMap[mb].scores.length;
       }
     }
 
-    // Write the sheet (clear and rewrite to keep it clean)
+    // --- Build dynamic headers: base + N score blocks ---
+    var headers = BASE_HEADERS.slice();
+    for (var h = 0; h < maxBlocks; h++) {
+      for (var sh = 0; sh < SCORE_HEADERS.length; sh++) {
+        headers.push(h === 0 ? SCORE_HEADERS[sh] : SCORE_HEADERS[sh] + ' [' + (h + 1) + ']');
+      }
+    }
+    var totalCols = headers.length;
+
+    // --- Build rows ---
+    var rows = [];
+    for (var ri = 0; ri < compList.length; ri++) {
+      var comp = compList[ri];
+      var entry = existingMap[comp.name];
+      var row = [ri + 1, comp.name, comp.division];
+      for (var sb = 0; sb < maxBlocks; sb++) {
+        if (entry && sb < entry.scores.length) {
+          row.push(entry.scores[sb].time, entry.scores[sb].waitTime, entry.scores[sb].tnt, entry.scores[sb].notes);
+        } else {
+          row.push('', '', '', '');
+        }
+      }
+      rows.push(row);
+    }
+
+    // --- Write the sheet (clear and rewrite) ---
     sheet.clear();
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    sheet.getRange(1, 1, 1, headers.length)
+    sheet.getRange(1, 1, 1, totalCols).setValues([headers]);
+    sheet.getRange(1, 1, 1, totalCols)
       .setFontWeight('bold')
       .setBackground('#2c5f2d')
       .setFontColor('#ffffff');
     sheet.setFrozenRows(1);
 
     if (rows.length) {
-      sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+      sheet.getRange(2, 1, rows.length, totalCols).setValues(rows);
     }
 
-    for (var col = 1; col <= headers.length; col++) {
+    for (var col = 1; col <= totalCols; col++) {
       sheet.autoResizeColumn(col);
     }
 
