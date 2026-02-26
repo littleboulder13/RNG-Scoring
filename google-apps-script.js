@@ -217,6 +217,10 @@ function _pushEvent(ss, ev) {
     sheet.setFrozenRows(1);
   }
 
+  // Always ensure headers are correct (fixes column drift)
+  var correctHeaders = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated'];
+  sheet.getRange(1, 1, 1, correctHeaders.length).setValues([correctHeaders]);
+
   // Find existing row for this event ID
   var dataRange = sheet.getDataRange();
   var values = dataRange.getValues();
@@ -258,17 +262,11 @@ function _pullEvents() {
     return _jsonResponse({ events: [] });
   }
 
-  var numCols = sheet.getLastColumn();
-  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, numCols).getValues();
+  // Always read exactly 5 columns — matches _pushEvent write order:
+  // [EventID, Name, Stages(JSON), Competitors(JSON), Updated]
+  var numRows = sheet.getLastRow() - 1;
+  var data = sheet.getRange(2, 1, numRows, 5).getValues();
 
-  // Read headers to find column positions
-  var headers = sheet.getRange(1, 1, 1, numCols).getValues()[0];
-  var colIdx = {};
-  for (var c = 0; c < headers.length; c++) {
-    colIdx[String(headers[c]).toLowerCase().replace(/\s+/g, '')] = c;
-  }
-
-  // Safe JSON parse helper — returns fallback if value isn't valid JSON
   function safeParse(val, fallback) {
     if (!val || typeof val !== 'string') return fallback;
     try { return JSON.parse(val); }
@@ -276,17 +274,11 @@ function _pullEvents() {
   }
 
   var events = data.map(function(row) {
-    var idCol   = colIdx['eventid'] !== undefined ? colIdx['eventid'] : 0;
-    var nameCol = colIdx['name'] !== undefined ? colIdx['name'] : 1;
-    // Stages/Competitors could be at different positions depending on whether Date column exists
-    var stagesCol = colIdx['stages'] !== undefined ? colIdx['stages'] : (numCols >= 6 ? 3 : 2);
-    var compCol   = colIdx['competitors'] !== undefined ? colIdx['competitors'] : (numCols >= 6 ? 4 : 3);
-
     return {
-      id:          row[idCol],
-      name:        row[nameCol],
-      stages:      safeParse(row[stagesCol], []),
-      competitors: safeParse(row[compCol], [])
+      id:          row[0],
+      name:        row[1],
+      stages:      safeParse(row[2], []),
+      competitors: safeParse(row[3], [])
     };
   });
 
