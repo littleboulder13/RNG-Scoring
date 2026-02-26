@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v63';
+const APP_VERSION = 'v64';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbyCxJFGjMnnGU4WIJgC66ZAQkdBd-5OciDVOiTjAcR1fTJznDeqyJdi9ntzqyye_Rub/exec';
 
 function getSyncUrl() {
@@ -128,8 +128,8 @@ function _postToAppsScript(payload, queryString) {
 }
 
 /* --- Helper: Pull data from Apps Script --- */
-/* Try fetch GET (hits doGet). If CORS blocks it, fall back to POST with    */
-/* the action in the body (needs updated doPost to handle pull actions).    */
+/* Try fetch GET first (doGet). If CORS blocks it, fall back to POST with */
+/* the action in a URL query parameter (needs updated doPost).            */
 function _fetchFromAppsScript(action) {
     const url = getSyncUrl() + '?action=' + action + '&_t=' + Date.now();
 
@@ -140,23 +140,29 @@ function _fetchFromAppsScript(action) {
             catch (_) { throw new Error('Non-JSON: ' + text.substring(0, 200)); }
         })
         .catch(fetchErr => {
-            console.warn('fetch GET failed (' + fetchErr.message + ') — falling back to POST');
-            return _postToAppsScript({ action: action });
+            // fetch GET blocked by CORS — fall back to POST with action in query string
+            console.warn('fetch GET failed (' + fetchErr.message + ') — trying POST');
+            return _postToAppsScript({}, '?action=' + action);
         })
         .then(data => {
-            // Detect old Apps Script that doesn't handle pull via POST
-            if (data && data.error === 'No scores provided') {
-                throw new Error(
-                    'Your Google Apps Script deployment is out of date.\n\n' +
-                    'To fix:\n' +
-                    '1. Open your Apps Script project\n' +
-                    '2. Replace ALL the code with the latest google-apps-script.js\n' +
-                    '3. Click Deploy → Manage deployments\n' +
-                    '4. Click the pencil ✏️ icon to edit\n' +
-                    '5. Change Version to "New version"\n' +
-                    '6. Click Deploy\n\n' +
-                    '(The version dropdown is the key step most people miss!)'
-                );
+            // Detect old Apps Script that can't handle pull actions
+            if (data && data.success === false && data.error) {
+                var err = data.error;
+                if (err.indexOf('No scores') >= 0 || err.indexOf('JSON') >= 0 ||
+                    err.indexOf('Unexpected') >= 0 || err.indexOf('postData') >= 0) {
+                    throw new Error(
+                        'Your Google Apps Script needs to be redeployed.\n\n' +
+                        'IMPORTANT — Create a NEW deployment:\n' +
+                        '1. Open your Apps Script project\n' +
+                        '2. Replace ALL code with the latest google-apps-script.js\n' +
+                        '3. Click Deploy → NEW deployment (not Manage)\n' +
+                        '4. Type: Web app | Execute as: Me | Access: Anyone\n' +
+                        '5. Click Deploy\n' +
+                        '6. Copy the NEW URL\n' +
+                        '7. Paste it in the app Settings (⚙) → Sync URL\n\n' +
+                        'Server said: ' + err
+                    );
+                }
             }
             return data;
         });
