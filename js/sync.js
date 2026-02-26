@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v79';
+const APP_VERSION = 'v80';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxl5_JrmYOV_oOW0COYUlGa_XrEFNT57CHJyTOznHQbO_FivjN_KYv2zkgqbD3N4nwz/exec';
 
 function getSyncUrl() {
@@ -238,6 +238,71 @@ async function pushAllEvents() {
     }
 
     if (pushBtn) { pushBtn.disabled = false; pushBtn.textContent = '\u2B06 Push Events to Cloud'; }
+}
+
+/* --- Silent auto-pull: merge cloud events without user alerts --- */
+async function autoPullEvents() {
+    if (!navigator.onLine) return;
+    try {
+        const data = await _fetchFromAppsScript('pullEvents');
+        if (!data.events || !data.events.length) return;
+
+        const local = getEvents();
+        let changed = false;
+
+        for (const remote of data.events) {
+            const idx = local.findIndex(e => e.id === remote.id);
+            if (idx === -1) {
+                local.push(remote);
+                changed = true;
+            } else {
+                // Update if remote has newer data
+                if (local[idx].name !== remote.name ||
+                    JSON.stringify(local[idx].stages) !== JSON.stringify(remote.stages) ||
+                    JSON.stringify(local[idx].competitors) !== JSON.stringify(remote.competitors)) {
+                    local[idx].name = remote.name;
+                    local[idx].stages = remote.stages;
+                    local[idx].competitors = remote.competitors;
+                    changed = true;
+                }
+            }
+        }
+
+        if (changed) saveEvents(local);
+
+        // Also pull archived events silently
+        try {
+            const archiveData = await _fetchFromAppsScript('pullArchivedEvents');
+            if (archiveData.events && archiveData.events.length) {
+                const localArchived = getArchivedEvents();
+                for (const remote of archiveData.events) {
+                    if (!localArchived.find(e => e.id === remote.id)) {
+                        localArchived.push(remote);
+                        changed = true;
+                    }
+                }
+                if (changed) saveArchivedEvents(localArchived);
+            }
+        } catch (_) { /* ignore archive pull errors silently */ }
+
+        // Re-render overlay if it's currently visible
+        if (changed) {
+            const overlay = $('event-overlay');
+            if (overlay && overlay.style.display !== 'none') {
+                renderEventOverlay();
+            }
+            // Also refresh main UI if active event was updated
+            if (getActiveEvent()) {
+                populatePlayerDropdown();
+                populateStageDropdown();
+                showStageInfo();
+            }
+        }
+
+        console.log('Auto-pull complete' + (changed ? ' (events updated)' : ' (no changes)'));
+    } catch (err) {
+        console.warn('Auto-pull events failed:', err.message);
+    }
 }
 
 /* --- Pull all events from the cloud and merge into localStorage --- */

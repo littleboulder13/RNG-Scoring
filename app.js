@@ -66,10 +66,15 @@ async function init() {
     window.addEventListener('offline', updateOnlineStatus);
     window.addEventListener('online', async () => {
         if (getSyncUrl() && (await getPendingScores()).length) setTimeout(syncScores, 1000);
+        // Auto-pull latest events when reconnecting
+        setTimeout(autoPullEvents, 1500);
     });
 
     // Auto-sync the Apps Script URL from the cloud
     autoSyncUrl();
+
+    // Auto-pull latest events from the cloud on startup
+    autoPullEvents();
 }
 
 // Service Worker Registration
@@ -88,6 +93,8 @@ function showEventOverlay() {
     renderEventOverlay();
     $('event-overlay').style.display = 'flex';
     $('active-event-bar').style.display = 'none';
+    // Auto-pull latest events from the cloud
+    autoPullEvents();
 }
 
 function hideEventOverlay() {
