@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v98';
+const APP_VERSION = 'v99';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxDwug8yxfGbuqVKWUb7WTZh89NJQzp5ZaIIC3aPs4w4iiWogk0Yvg7M9ASgy70NOkW/exec';
 
 function getSyncUrl() {
@@ -204,30 +204,24 @@ async function pullEvents() {
     try {
         const data = await _fetchFromAppsScript('pullEvents');
 
-        // Debug: show raw response if no events found
-        if (!data.events || !data.events.length) {
-            const raw = JSON.stringify(data).substring(0, 300);
-            alert('App ' + APP_VERSION + ' | Method: XHR POST\n\nNo events found.\n\nServer response:\n' + raw);
-            return;
-        }
-
         const local = getEvents();
         let added = 0, updated = 0;
 
-        for (const remote of data.events) {
-            const idx = local.findIndex(e => e.id === remote.id);
-            if (idx === -1) {
-                local.push(remote);
-                added++;
-            } else {
-                local[idx].name = remote.name;
-                local[idx].stages = remote.stages;
-                local[idx].competitors = remote.competitors;
-                updated++;
+        if (data.events && data.events.length) {
+            for (const remote of data.events) {
+                const idx = local.findIndex(e => e.id === remote.id);
+                if (idx === -1) {
+                    local.push(remote);
+                    added++;
+                } else {
+                    local[idx].name = remote.name;
+                    local[idx].stages = remote.stages;
+                    local[idx].competitors = remote.competitors;
+                    updated++;
+                }
             }
+            saveEvents(local);
         }
-
-        saveEvents(local);
 
         // Also pull archived events from cloud
         let archivedPulled = 0;
@@ -252,18 +246,19 @@ async function pullEvents() {
         try {
             const delData = await _fetchFromAppsScript('pullDeletedEventIds');
             if (delData.deletedEventIds && delData.deletedEventIds.length) {
-                const deletedSet = new Set(delData.deletedEventIds);
+                // Convert to strings for reliable comparison (sheet may return numbers)
+                const deletedSet = new Set(delData.deletedEventIds.map(String));
 
                 // Remove from active events list
-                const freshLocal = getEvents().filter(e => !deletedSet.has(e.id));
+                const freshLocal = getEvents().filter(e => !deletedSet.has(String(e.id)));
                 saveEvents(freshLocal);
 
                 // Remove from archived events list
-                const freshArchived = getArchivedEvents().filter(e => !deletedSet.has(e.id));
+                const freshArchived = getArchivedEvents().filter(e => !deletedSet.has(String(e.id)));
                 saveArchivedEvents(freshArchived);
 
                 // Clear active event if it was deleted
-                if (deletedSet.has(getActiveEventId())) clearActiveEvent();
+                if (deletedSet.has(String(getActiveEventId()))) clearActiveEvent();
 
                 // Delete scores from IndexedDB for each deleted event
                 for (const eid of delData.deletedEventIds) {
