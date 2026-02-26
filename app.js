@@ -66,15 +66,20 @@ async function init() {
     window.addEventListener('offline', updateOnlineStatus);
     window.addEventListener('online', async () => {
         if (getSyncUrl() && (await getPendingScores()).length) setTimeout(syncScores, 1000);
-        // Auto-pull latest events when reconnecting
-        setTimeout(autoPullEvents, 1500);
+        // Auto-pull latest events when reconnecting, then push local changes
+        setTimeout(() => autoPullEvents().then(() => autoPushAllEvents()), 1500);
     });
 
     // Auto-sync the Apps Script URL from the cloud
     autoSyncUrl();
 
     // Auto-pull latest events from the cloud on startup
-    autoPullEvents();
+    autoPullEvents().then(() => autoPushAllEvents());
+
+    // Periodic auto-pull every 2 minutes to stay in sync
+    setInterval(() => {
+        if (navigator.onLine) autoPullEvents();
+    }, 2 * 60 * 1000);
 }
 
 // Service Worker Registration
@@ -328,7 +333,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Event Editor: close, done, add competitor, import ---
     $('event-editor-close').addEventListener('click', () => {
         saveEventEditorFields();
+        const wasEditingId = editingEventId;
         closeEventEditor();
+        // Push changes to cloud even when closing with X
+        if (wasEditingId) pushEventConfig(wasEditingId);
+        if (wasEditingId === getActiveEventId()) {
+            refreshAfterEventChange();
+        }
     });
     $('event-editor-done').addEventListener('click', () => {
         saveEventEditorFields();

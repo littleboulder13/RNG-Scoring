@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v85';
+const APP_VERSION = 'v86';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxl5_JrmYOV_oOW0COYUlGa_XrEFNT57CHJyTOznHQbO_FivjN_KYv2zkgqbD3N4nwz/exec';
 
 function getSyncUrl() {
@@ -133,7 +133,11 @@ function _postToAppsScript(payload, queryString) {
 function _fetchFromAppsScript(action) {
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', getSyncUrl());
+        // Send action in BOTH URL query string and POST body.
+        // Google Apps Script redirects POST→GET, losing the body.
+        // The query parameter survives the redirect chain.
+        const url = getSyncUrl() + '?action=' + encodeURIComponent(action);
+        xhr.open('POST', url);
         xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
         xhr.onload = function () {
             try {
@@ -240,13 +244,35 @@ async function pushAllEvents() {
     if (pushBtn) { pushBtn.disabled = false; pushBtn.textContent = '\u2B06 Push Events to Cloud'; }
 }
 
+/* --- Silent auto-push: push all local events to cloud without alerts --- */
+async function autoPushAllEvents() {
+    if (!navigator.onLine) return;
+    const events = getEvents();
+    if (!events.length) return;
+
+    for (const ev of events) {
+        try {
+            await _postToAppsScript({ action: 'pushEvent', event: ev });
+        } catch (err) {
+            console.warn('Auto-push failed for', ev.name, ':', err.message);
+        }
+    }
+    console.log('Auto-push complete:', events.length, 'event(s)');
+}
+
 /* --- Silent auto-pull: merge cloud events without user alerts --- */
 async function autoPullEvents() {
     if (!navigator.onLine) return;
     try {
         const data = await _fetchFromAppsScript('pullEvents');
-        const cloudEvents = (data && data.events) ? data.events : [];
 
+        // Validate the response looks like an events response
+        if (!data || !Array.isArray(data.events)) {
+            console.warn('Auto-pull: unexpected response shape:', JSON.stringify(data).substring(0, 200));
+            return;
+        }
+
+        const cloudEvents = data.events;
         const local = getEvents();
         let changed = false;
 
