@@ -150,6 +150,11 @@ function updateOnlineStatus() {
 function renderEventOverlay() {
     const cardsEl = $('event-cards');
     if (!cardsEl) return;
+
+    // Always sync version badge from JS constant (survives stale HTML cache)
+    const versionEl = $('app-version');
+    if (versionEl && typeof APP_VERSION !== 'undefined') versionEl.textContent = APP_VERSION;
+
     const events = getEvents();
 
     if (!events.length) {
