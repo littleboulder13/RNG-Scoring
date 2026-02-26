@@ -18,6 +18,7 @@ function doPost(e) {
     if (paramAction === 'pullEvents') return _pullEvents();
     if (paramAction === 'pullConfig') return _pullConfig();
     if (paramAction === 'pullArchivedEvents') return _pullArchivedEvents();
+    if (paramAction === 'pullDeletedEventIds') return _pullDeletedEventIds();
 
     // Parse body for actions that need data
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -53,6 +54,10 @@ function doGet(e) {
 
   if (action === 'pullArchivedEvents') {
     return _pullArchivedEvents();
+  }
+
+  if (action === 'pullDeletedEventIds') {
+    return _pullDeletedEventIds();
   }
 
   return _jsonResponse({ status: 'ok', message: 'Stilly RNG sync endpoint is running' });
@@ -424,7 +429,37 @@ function _permanentlyDeleteEvent(ss, eventId, eventName, stageNames) {
 
   archiveSheet.deleteRow(rowToDelete);
 
+  // Record this event ID so other devices can clean up on next pull
+  _recordDeletedEvent(ss, eventId);
+
   return _jsonResponse({ success: true, eventId: eventId, deletedTabs: deletedTabs });
+}
+
+/* --- Deleted-Event Tracking (so other devices can clean up) --- */
+function _recordDeletedEvent(ss, eventId) {
+  var sheet = ss.getSheetByName('_DeletedEvents');
+  if (!sheet) {
+    sheet = ss.insertSheet('_DeletedEvents');
+    sheet.getRange(1, 1, 1, 2).setValues([['EventID', 'DeletedAt']]);
+    sheet.getRange(1, 1, 1, 2)
+      .setFontWeight('bold')
+      .setBackground('#b71c1c')
+      .setFontColor('#ffffff');
+    sheet.setFrozenRows(1);
+  }
+  sheet.getRange(sheet.getLastRow() + 1, 1, 1, 2)
+    .setValues([[eventId, new Date().toISOString()]]);
+}
+
+function _pullDeletedEventIds() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('_DeletedEvents');
+  if (!sheet || sheet.getLastRow() < 2) {
+    return _jsonResponse({ deletedEventIds: [] });
+  }
+  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
+  var ids = data.map(function(row) { return row[0]; }).filter(Boolean);
+  return _jsonResponse({ deletedEventIds: ids });
 }
 
 /* --- Pull Archived Events --- */

@@ -247,12 +247,43 @@ async function pullEvents() {
             console.warn('Failed to pull archived events:', archErr.message);
         }
 
+        // Pull deleted-event IDs from cloud and purge local data
+        let cleaned = 0;
+        try {
+            const delData = await _fetchFromAppsScript('pullDeletedEventIds');
+            if (delData.deletedEventIds && delData.deletedEventIds.length) {
+                const deletedSet = new Set(delData.deletedEventIds);
+
+                // Remove from active events list
+                const freshLocal = getEvents().filter(e => !deletedSet.has(e.id));
+                saveEvents(freshLocal);
+
+                // Remove from archived events list
+                const freshArchived = getArchivedEvents().filter(e => !deletedSet.has(e.id));
+                saveArchivedEvents(freshArchived);
+
+                // Clear active event if it was deleted
+                if (deletedSet.has(getActiveEventId())) clearActiveEvent();
+
+                // Delete scores from IndexedDB for each deleted event
+                for (const eid of delData.deletedEventIds) {
+                    try {
+                        await deleteScoresByEventId(eid);
+                        cleaned++;
+                    } catch (_) { /* ignore — may have no scores for this event */ }
+                }
+            }
+        } catch (delErr) {
+            console.warn('Failed to pull deleted-event list:', delErr.message);
+        }
+
         renderEventOverlay();
 
         const parts = [];
         if (added)   parts.push(`${added} new`);
         if (updated) parts.push(`${updated} updated`);
         if (archivedPulled) parts.push(`${archivedPulled} old`);
+        if (cleaned) parts.push(`${cleaned} cleaned up`);
         alert(`\u2713 Pulled events from cloud: ${parts.join(', ') || 'already up to date'}`);
     } catch (err) {
         console.error('Pull error:', err);
