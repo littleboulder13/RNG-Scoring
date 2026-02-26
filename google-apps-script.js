@@ -42,20 +42,22 @@ function doPost(e) {
 
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) || 'status';
+  var callback = (e && e.parameter && e.parameter.callback) || '';
 
-  if (action === 'pullEvents') {
-    return _pullEvents();
+  var result;
+  if (action === 'pullEvents')          result = _pullEventsData();
+  else if (action === 'pullConfig')      result = _pullConfigData();
+  else if (action === 'pullArchivedEvents') result = _pullArchivedEventsData();
+  else result = { status: 'ok', message: 'Stilly RNG sync endpoint is running' };
+
+  // JSONP support — bypasses CORS issues on iOS PWA standalone mode
+  if (callback && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(callback)) {
+    return ContentService
+      .createTextOutput(callback + '(' + JSON.stringify(result) + ')')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
   }
 
-  if (action === 'pullConfig') {
-    return _pullConfig();
-  }
-
-  if (action === 'pullArchivedEvents') {
-    return _pullArchivedEvents();
-  }
-
-  return _jsonResponse({ status: 'ok', message: 'Stilly RNG sync endpoint is running' });
+  return _jsonResponse(result);
 }
 
 /* --- Score Sync (one tab per stage, all competitors listed) --- */
@@ -258,17 +260,15 @@ function _pushEvent(ss, ev) {
   return _jsonResponse({ success: true, eventId: ev.id });
 }
 
-/* --- Pull Events --- */
-function _pullEvents() {
+/* --- Pull Events (data helper used by doGet for JSONP) --- */
+function _pullEventsData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Events') || ss.getSheetByName('_Events');
 
   if (!sheet || sheet.getLastRow() < 2) {
-    return _jsonResponse({ events: [] });
+    return { events: [] };
   }
 
-  // Always read exactly 6 columns — matches _pushEvent write order:
-  // [EventID, Name, Stages(JSON), Competitors(JSON), Updated, Password]
   var numRows = sheet.getLastRow() - 1;
   var data = sheet.getRange(2, 1, numRows, 6).getValues();
 
@@ -278,17 +278,21 @@ function _pullEvents() {
     catch (_) { return fallback; }
   }
 
-  var events = data.map(function(row) {
-    return {
-      id:          row[0],
-      name:        row[1],
-      stages:      safeParse(row[2], []),
-      competitors: safeParse(row[3], []),
-      password:    row[5] || ''
-    };
-  });
+  return {
+    events: data.map(function(row) {
+      return {
+        id:          row[0],
+        name:        row[1],
+        stages:      safeParse(row[2], []),
+        competitors: safeParse(row[3], []),
+        password:    row[5] || ''
+      };
+    })
+  };
+}
 
-  return _jsonResponse({ events: events });
+function _pullEvents() {
+  return _jsonResponse(_pullEventsData());
 }
 
 /* --- Archive Event (move from Events → ArchivedEvents) --- */
@@ -428,13 +432,13 @@ function _permanentlyDeleteEvent(ss, eventId, eventName, stageNames) {
   return _jsonResponse({ success: true, eventId: eventId, deletedTabs: deletedTabs });
 }
 
-/* --- Pull Archived Events --- */
-function _pullArchivedEvents() {
+/* --- Pull Archived Events (data helper used by doGet for JSONP) --- */
+function _pullArchivedEventsData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('ArchivedEvents');
 
   if (!sheet || sheet.getLastRow() < 2) {
-    return _jsonResponse({ events: [] });
+    return { events: [] };
   }
 
   var numCols = sheet.getLastColumn();
@@ -446,16 +450,20 @@ function _pullArchivedEvents() {
     catch (_) { return fallback; }
   }
 
-  var events = data.map(function(row) {
-    return {
-      id:          row[0],
-      name:        row[1],
-      stages:      safeParse(row[2], []),
-      competitors: safeParse(row[3], [])
-    };
-  });
+  return {
+    events: data.map(function(row) {
+      return {
+        id:          row[0],
+        name:        row[1],
+        stages:      safeParse(row[2], []),
+        competitors: safeParse(row[3], [])
+      };
+    })
+  };
+}
 
-  return _jsonResponse({ events: events });
+function _pullArchivedEvents() {
+  return _jsonResponse(_pullArchivedEventsData());
 }
 
 function _jsonResponse(obj) {
@@ -509,8 +517,12 @@ function _pushConfig(ss, config) {
   return _jsonResponse({ success: true });
 }
 
-function _pullConfig() {
+function _pullConfigData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var syncUrl = _getConfig(ss, 'syncUrl');
-  return _jsonResponse({ syncUrl: syncUrl || '' });
+  return { syncUrl: syncUrl || '' };
+}
+
+function _pullConfig() {
+  return _jsonResponse(_pullConfigData());
 }

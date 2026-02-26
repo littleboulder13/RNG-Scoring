@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v92';
+const APP_VERSION = 'v93';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxl5_JrmYOV_oOW0COYUlGa_XrEFNT57CHJyTOznHQbO_FivjN_KYv2zkgqbD3N4nwz/exec';
 
 function getSyncUrl() {
@@ -131,27 +131,64 @@ function _postToAppsScript(payload, queryString) {
     });
 }
 
-/* --- Helper: Pull data from Apps Script via XHR GET --- */
-/* GET avoids the POST→GET redirect body-stripping issue on iOS.           */
-/* doGet() on the server already handles pullEvents/pullConfig/etc.         */
+/* --- Helper: Pull data from Apps Script via JSONP (primary) + XHR (fallback) --- */
+/* JSONP bypasses CORS entirely — script tags don't enforce same-origin.    */
+/* Falls back to XHR GET on desktop where CORS works fine.                  */
 function _fetchFromAppsScript(action) {
+    return _jsonpFetch(action).catch(() => _xhrFetch(action));
+}
+
+function _jsonpFetch(action) {
+    return new Promise((resolve, reject) => {
+        const cbName = '_rngcb_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+        const url = getSyncUrl() + '?action=' + encodeURIComponent(action) + '&callback=' + cbName;
+        const script = document.createElement('script');
+        let done = false;
+
+        const timer = setTimeout(() => {
+            if (done) return;
+            done = true; cleanup();
+            reject(new Error('JSONP timeout'));
+        }, 8000);
+
+        function cleanup() {
+            clearTimeout(timer);
+            delete window[cbName];
+            if (script.parentNode) script.parentNode.removeChild(script);
+        }
+
+        window[cbName] = function(data) {
+            if (done) return;
+            done = true; cleanup();
+            resolve(data);
+        };
+
+        script.onerror = function() {
+            if (done) return;
+            done = true; cleanup();
+            reject(new Error('JSONP script failed'));
+        };
+
+        script.src = url;
+        document.head.appendChild(script);
+    });
+}
+
+function _xhrFetch(action) {
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         const url = getSyncUrl() + '?action=' + encodeURIComponent(action);
         xhr.open('GET', url);
         xhr.onload = function () {
             if (xhr.status >= 400) {
-                reject(new Error('HTTP ' + xhr.status + ': ' + xhr.responseText.substring(0, 200)));
+                reject(new Error('HTTP ' + xhr.status));
                 return;
             }
-            try {
-                resolve(JSON.parse(xhr.responseText));
-            } catch (_) {
-                reject(new Error('Invalid JSON (status ' + xhr.status + '): ' + xhr.responseText.substring(0, 200)));
-            }
+            try { resolve(JSON.parse(xhr.responseText)); }
+            catch (_) { reject(new Error('Invalid JSON')); }
         };
-        xhr.onerror = function () { reject(new Error('XHR onerror (readyState=' + xhr.readyState + ', status=' + xhr.status + ')')); };
-        xhr.ontimeout = function () { reject(new Error('XHR timeout after 10s')); };
+        xhr.onerror = function () { reject(new Error('XHR onerror (status=' + xhr.status + ')')); };
+        xhr.ontimeout = function () { reject(new Error('XHR timeout')); };
         xhr.timeout = 10000;
         xhr.send();
     });
