@@ -362,11 +362,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const stage     = getStages().find(s => s.name === stageName);
         const stageTargets = stage?.targets !== '' ? parseInt(stage?.targets) : NaN;
 
-        if ($('dnf').checked && !isNaN(stageTargets) && tnt > stageTargets) {
-            const err = $('form-error');
-            err.textContent = "Targets not neutralized input is too high. Review the value input.";
-            err.style.display = 'block';
-            return;
+        if ($('dnf').checked) {
+            // DNF requires TNT > 0 and <= stage targets
+            if (!isNaN(stageTargets)) {
+                if (tnt <= 0 || tnt > stageTargets) {
+                    const err = $('form-error');
+                    err.textContent = 'Correct Targets Not Neutralized value.';
+                    err.style.display = 'block';
+                    return;
+                }
+            } else if (tnt <= 0) {
+                const err = $('form-error');
+                err.textContent = 'Correct Targets Not Neutralized value.';
+                err.style.display = 'block';
+                return;
+            }
         }
 
         // Par time validation (only when not DNF)
