@@ -96,7 +96,7 @@ function promptSyncUrl() {
 async function autoSyncUrl() {
     if (!navigator.onLine) return;
     try {
-        const data = await _postToAppsScript({}, '?action=pullConfig');
+        const data = await _fetchFromAppsScript('pullConfig');
         if (data && data.syncUrl && data.syncUrl.startsWith('https://script.google.com/')) {
             const current = getSyncUrl();
             if (data.syncUrl !== current) {
@@ -126,21 +126,20 @@ function _postToAppsScript(payload, queryString) {
     });
 }
 
-/* --- Helper: GET from Apps Script via XHR (reliable on iOS PWAs) --- */
-function _getFromAppsScript(params) {
-    return new Promise((resolve, reject) => {
-        const url = getSyncUrl() + '?' + params + '&_t=' + Date.now();
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', url);
-        xhr.onload = function () {
-            try { resolve(JSON.parse(xhr.responseText)); }
-            catch (_) { reject(new Error('Invalid response: ' + xhr.responseText.substring(0, 200))); }
-        };
-        xhr.onerror = function () { reject(new Error('Network request failed')); };
-        xhr.ontimeout = function () { reject(new Error('Request timed out')); };
-        xhr.timeout = 30000;
-        xhr.send();
-    });
+/* --- Helper: Fetch data from Apps Script (GET via fetch, POST fallback) --- */
+function _fetchFromAppsScript(action) {
+    const url = getSyncUrl() + '?action=' + action + '&_t=' + Date.now();
+
+    // Try fetch GET first (works on Chrome, may fail on iOS PWA)
+    return fetch(url, { redirect: 'follow' })
+        .then(r => {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        })
+        .catch(() => {
+            // Fallback: POST with action in query string
+            return _postToAppsScript({}, '?action=' + action);
+        });
 }
 
 function updateSyncStatus() {
@@ -209,7 +208,7 @@ async function pullEvents() {
     if (pullBtn) { pullBtn.disabled = true; pullBtn.textContent = 'Pulling\u2026'; }
 
     try {
-        const data = await _postToAppsScript({}, '?action=pullEvents');
+        const data = await _fetchFromAppsScript('pullEvents');
 
         // Debug: show raw response if no events found
         if (!data.events || !data.events.length) {
