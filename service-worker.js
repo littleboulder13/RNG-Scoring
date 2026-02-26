@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rng-scoring-v89';
+const CACHE_NAME = 'rng-scoring-v90';
 const urlsToCache = [
     './',
     './index.html',
@@ -30,10 +30,18 @@ self.addEventListener('install', (event) => {
 self.addEventListener('fetch', (event) => {
     const url = event.request.url;
 
-    // Let API calls bypass the service worker entirely — do NOT use respondWith()
-    // Cross-origin redirects (script.google.com → googleusercontent.com) produce
-    // opaque responses that cause respondWith() to throw TypeError: Load failed
+    // API calls: pass through to network, no caching.
+    // MUST call respondWith (not just return) due to iOS WebKit bug
+    // where return; without respondWith breaks cross-origin XHR.
+    // .catch() prevents respondWith from throwing if the fetch fails.
     if (url.includes('script.google.com') || url.includes('googleusercontent.com')) {
+        event.respondWith(
+            fetch(event.request.clone())
+                .catch(() => new Response(JSON.stringify({ error: 'network' }), {
+                    status: 502,
+                    headers: { 'Content-Type': 'application/json' }
+                }))
+        );
         return;
     }
 

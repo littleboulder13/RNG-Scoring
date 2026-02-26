@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v89';
+const APP_VERSION = 'v90';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxl5_JrmYOV_oOW0COYUlGa_XrEFNT57CHJyTOznHQbO_FivjN_KYv2zkgqbD3N4nwz/exec';
 
 function getSyncUrl() {
@@ -127,14 +127,14 @@ function _postToAppsScript(payload, queryString) {
     });
 }
 
-/* --- Helper: Pull data from Apps Script via XHR --- */
-/* Action sent in both URL query string (survives redirects) and POST body. */
+/* --- Helper: Pull data from Apps Script via XHR GET --- */
+/* GET avoids the POST→GET redirect body-stripping issue on iOS.           */
+/* doGet() on the server already handles pullEvents/pullConfig/etc.         */
 function _fetchFromAppsScript(action) {
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         const url = getSyncUrl() + '?action=' + encodeURIComponent(action);
-        xhr.open('POST', url);
-        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        xhr.open('GET', url);
         xhr.onload = function () {
             try {
                 resolve(JSON.parse(xhr.responseText));
@@ -145,7 +145,7 @@ function _fetchFromAppsScript(action) {
         xhr.onerror = function () { reject(new Error('Network request failed')); };
         xhr.ontimeout = function () { reject(new Error('Request timed out')); };
         xhr.timeout = 30000;
-        xhr.send('action=' + encodeURIComponent(action));
+        xhr.send();
     });
 }
 
