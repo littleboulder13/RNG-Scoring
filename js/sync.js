@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v93';
+const APP_VERSION = 'v94';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxl5_JrmYOV_oOW0COYUlGa_XrEFNT57CHJyTOznHQbO_FivjN_KYv2zkgqbD3N4nwz/exec';
 
 function getSyncUrl() {
@@ -194,52 +194,73 @@ function _xhrFetch(action) {
     });
 }
 
-/* --- Manual Pull from Cloud — diagnostic button on event overlay --- */
+/* --- Manual Pull from Cloud — step-by-step diagnostic --- */
 async function manualPullFromCloud() {
     const btn = $('pull-cloud-btn');
     const status = $('pull-status');
     if (btn) btn.disabled = true;
-    if (status) status.textContent = 'Pulling…';
 
-    const url = getSyncUrl() + '?action=pullEvents';
+    function log(msg, color) {
+        if (status) { status.innerHTML = msg; status.style.color = color || '#aaa'; }
+    }
 
+    // Step 1: Try JSONP (bypasses CORS — requires Apps Script redeployment)
+    log('Step 1/2: Trying JSONP…');
+    let jsonpErr = null;
     try {
-        const data = await _fetchFromAppsScript('pullEvents');
+        const data = await _jsonpFetch('pullEvents');
+        log('✓ JSONP succeeded!', '#4f4');
+        return handlePullData(data, status, btn);
+    } catch (e) {
+        jsonpErr = e.message;
+        log('JSONP failed: ' + jsonpErr + '<br>Step 2/2: Trying XHR…', '#fa0');
+    }
 
-        if (!data || !Array.isArray(data.events)) {
-            const raw = JSON.stringify(data).substring(0, 300);
-            if (status) { status.textContent = '✗ Bad response: ' + raw; status.style.color = '#f44'; }
-            if (btn) btn.disabled = false;
-            return;
-        }
-
-        // Merge into local storage (cloud is source of truth)
-        const local = getEvents();
-        const cloudIds = new Set(data.events.map(e => e.id));
-        const merged = local.filter(e => cloudIds.has(e.id));
-
-        for (const remote of data.events) {
-            const idx = merged.findIndex(e => e.id === remote.id);
-            if (idx === -1) {
-                merged.push(remote);
-            } else {
-                merged[idx].name = remote.name;
-                merged[idx].stages = remote.stages;
-                merged[idx].competitors = remote.competitors;
-                merged[idx].password = remote.password || '';
-            }
-        }
-
-        saveEvents(merged);
-        renderEventOverlay();
-        if (status) { status.textContent = '✓ Got ' + data.events.length + ' event(s)'; status.style.color = '#4f4'; }
-        showSyncToast('✓ Pulled ' + data.events.length + ' event(s)');
-    } catch (err) {
-        if (status) { status.textContent = '✗ ' + err.message; status.style.color = '#f44'; }
-        showSyncToast('✗ Pull failed: ' + err.message, true);
-    } finally {
+    // Step 2: Fallback to XHR (works on desktop, CORS-blocked on iOS PWA)
+    try {
+        const data = await _xhrFetch('pullEvents');
+        log('✓ XHR succeeded!', '#4f4');
+        return handlePullData(data, status, btn);
+    } catch (e) {
+        const xhrErr = e.message;
+        log('✗ Both methods failed:<br>JSONP: ' + jsonpErr + '<br>XHR: ' + xhrErr +
+            '<br><br>⚠ Did you redeploy the Apps Script?<br>' +
+            '<span style="font-size:0.65rem;color:#999;">Open Apps Script → Deploy → Manage → Edit → New version → Deploy</span>', '#f44');
+        showSyncToast('✗ Pull failed', true);
         if (btn) btn.disabled = false;
     }
+}
+
+function handlePullData(data, statusEl, btn) {
+    if (!data || !Array.isArray(data.events)) {
+        const raw = JSON.stringify(data).substring(0, 300);
+        if (statusEl) { statusEl.textContent = '✗ Bad response: ' + raw; statusEl.style.color = '#f44'; }
+        if (btn) btn.disabled = false;
+        return;
+    }
+
+    // Merge into local storage (cloud is source of truth)
+    const local = getEvents();
+    const cloudIds = new Set(data.events.map(e => e.id));
+    const merged = local.filter(e => cloudIds.has(e.id));
+
+    for (const remote of data.events) {
+        const idx = merged.findIndex(e => e.id === remote.id);
+        if (idx === -1) {
+            merged.push(remote);
+        } else {
+            merged[idx].name = remote.name;
+            merged[idx].stages = remote.stages;
+            merged[idx].competitors = remote.competitors;
+            merged[idx].password = remote.password || '';
+        }
+    }
+
+    saveEvents(merged);
+    renderEventOverlay();
+    if (statusEl) { statusEl.textContent = '✓ Got ' + data.events.length + ' event(s)'; statusEl.style.color = '#4f4'; }
+    showSyncToast('✓ Pulled ' + data.events.length + ' event(s)');
+    if (btn) btn.disabled = false;
 }
 
 function updateSyncStatus() {
