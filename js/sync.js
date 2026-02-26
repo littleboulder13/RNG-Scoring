@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v90';
+const APP_VERSION = 'v91';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxl5_JrmYOV_oOW0COYUlGa_XrEFNT57CHJyTOznHQbO_FivjN_KYv2zkgqbD3N4nwz/exec';
 
 function getSyncUrl() {
@@ -117,6 +117,10 @@ function _postToAppsScript(payload, queryString) {
         xhr.open('POST', getSyncUrl() + (queryString || ''));
         xhr.setRequestHeader('Content-Type', 'text/plain');
         xhr.onload = function () {
+            if (xhr.status >= 400) {
+                reject(new Error('HTTP ' + xhr.status + ': ' + xhr.responseText.substring(0, 200)));
+                return;
+            }
             try { resolve(JSON.parse(xhr.responseText)); }
             catch (_) { resolve({ _raw: xhr.responseText }); }
         };
@@ -136,6 +140,10 @@ function _fetchFromAppsScript(action) {
         const url = getSyncUrl() + '?action=' + encodeURIComponent(action);
         xhr.open('GET', url);
         xhr.onload = function () {
+            if (xhr.status >= 400) {
+                reject(new Error('HTTP ' + xhr.status + ': ' + xhr.responseText.substring(0, 200)));
+                return;
+            }
             try {
                 resolve(JSON.parse(xhr.responseText));
             } catch (_) {
@@ -283,7 +291,9 @@ async function autoPullEvents() {
 
         // Validate the response looks like an events response
         if (!data || !Array.isArray(data.events)) {
-            console.warn('Auto-pull: unexpected response shape:', JSON.stringify(data).substring(0, 200));
+            const raw = JSON.stringify(data).substring(0, 100);
+            console.warn('Auto-pull: unexpected response:', raw);
+            showSyncToast('✗ Bad response: ' + raw, true);
             return;
         }
 

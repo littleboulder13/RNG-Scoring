@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rng-scoring-v90';
+const CACHE_NAME = 'rng-scoring-v91';
 const urlsToCache = [
     './',
     './index.html',
@@ -35,12 +35,17 @@ self.addEventListener('fetch', (event) => {
     // where return; without respondWith breaks cross-origin XHR.
     // .catch() prevents respondWith from throwing if the fetch fails.
     if (url.includes('script.google.com') || url.includes('googleusercontent.com')) {
+        // Use fresh fetch(url) for GET — avoids iOS WebKit bugs with cloned
+        // cross-origin requests. credentials:'omit' avoids redirect issues.
+        const fetchOpts = event.request.method === 'GET'
+            ? fetch(event.request.url, { redirect: 'follow', credentials: 'omit' })
+            : fetch(event.request.clone());
+
         event.respondWith(
-            fetch(event.request.clone())
-                .catch(() => new Response(JSON.stringify({ error: 'network' }), {
-                    status: 502,
-                    headers: { 'Content-Type': 'application/json' }
-                }))
+            fetchOpts.catch(err => new Response(
+                JSON.stringify({ error: err.message || 'network' }),
+                { status: 502, headers: { 'Content-Type': 'application/json' } }
+            ))
         );
         return;
     }
