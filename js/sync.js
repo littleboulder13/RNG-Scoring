@@ -1,6 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
+const APP_VERSION = 'v62';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbyCxJFGjMnnGU4WIJgC66ZAQkdBd-5OciDVOiTjAcR1fTJznDeqyJdi9ntzqyye_Rub/exec';
 
 function getSyncUrl() {
@@ -219,7 +220,7 @@ async function pullEvents() {
         // Debug: show raw response if no events found
         if (!data.events || !data.events.length) {
             const raw = JSON.stringify(data).substring(0, 300);
-            alert('No events found in the cloud.\n\nServer response:\n' + raw);
+            alert('App ' + APP_VERSION + ' | Method: XHR GET\n\nNo events found.\n\nServer response:\n' + raw);
             return;
         }
 
