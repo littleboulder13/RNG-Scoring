@@ -26,7 +26,7 @@
                 <img src="logo.png" alt="Stilly Run 'N Gun" class="event-logo">
                 <h1>Stilly Run 'N Gun</h1>
                 <p>Select an event to continue</p>
-                <span id="app-version" style="font-size:0.75rem;color:#ff0;background:#333;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px;">v80</span>
+                <span id="app-version" style="font-size:0.75rem;color:#ff0;background:#333;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px;">v81</span>
             </div>
             <div id="event-cards" class="event-cards">
                 <!-- Event cards rendered dynamically -->
@@ -54,6 +54,11 @@
                 <div class="form-group">
                     <label>Event Name</label>
                     <input type="text" id="edit-event-name" placeholder="Event name...">
+                </div>
+                <div class="form-group">
+                    <label>Event Password</label>
+                    <input type="text" id="edit-event-password" placeholder="Leave blank for no password">
+                    <span style="font-size:0.8rem;color:#888">If set, users must enter this password to access the event</span>
                 </div>
                 <hr class="editor-divider">
                 <h4>Competitors</h4>
@@ -226,6 +231,24 @@
             <div class="confirm-actions">
                 <button id="admin-pin-cancel" class="btn-secondary">Cancel</button>
                 <button id="admin-pin-submit" class="btn-primary">Continue</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Event Password Modal -->
+    <div id="event-password-modal" class="modal-overlay" style="display:none">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🔒 Event Password Required</h3>
+                <button id="event-password-close" class="btn-change-event">✕</button>
+            </div>
+            <div class="form-group">
+                <input type="password" id="event-password-input" placeholder="Enter event password...">
+                <div id="event-password-error" class="form-error" style="display:none">Incorrect password.</div>
+            </div>
+            <div class="confirm-actions">
+                <button id="event-password-cancel" class="btn-secondary">Cancel</button>
+                <button id="event-password-submit" class="btn-primary">Open Event</button>
             </div>
         </div>
     </div>

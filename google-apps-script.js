@@ -208,7 +208,7 @@ function _pushEvent(ss, ev) {
   var sheet = ss.getSheetByName('Events') || ss.getSheetByName('_Events');
   if (!sheet) {
     sheet = ss.insertSheet('Events');
-    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated'];
+    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password'];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.getRange(1, 1, 1, headers.length)
       .setFontWeight('bold')
@@ -218,7 +218,7 @@ function _pushEvent(ss, ev) {
   }
 
   // Always ensure headers are correct (fixes column drift)
-  var correctHeaders = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated'];
+  var correctHeaders = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password'];
   sheet.getRange(1, 1, 1, correctHeaders.length).setValues([correctHeaders]);
 
   // Find existing row for this event ID
@@ -237,7 +237,8 @@ function _pushEvent(ss, ev) {
     ev.name || '',
     JSON.stringify(ev.stages || []),
     JSON.stringify(ev.competitors || []),
-    new Date().toISOString()
+    new Date().toISOString(),
+    ev.password || ''
   ];
 
   if (existingRow > 0) {
@@ -262,10 +263,10 @@ function _pullEvents() {
     return _jsonResponse({ events: [] });
   }
 
-  // Always read exactly 5 columns — matches _pushEvent write order:
-  // [EventID, Name, Stages(JSON), Competitors(JSON), Updated]
+  // Always read exactly 6 columns — matches _pushEvent write order:
+  // [EventID, Name, Stages(JSON), Competitors(JSON), Updated, Password]
   var numRows = sheet.getLastRow() - 1;
-  var data = sheet.getRange(2, 1, numRows, 5).getValues();
+  var data = sheet.getRange(2, 1, numRows, 6).getValues();
 
   function safeParse(val, fallback) {
     if (!val || typeof val !== 'string') return fallback;
@@ -278,7 +279,8 @@ function _pullEvents() {
       id:          row[0],
       name:        row[1],
       stages:      safeParse(row[2], []),
-      competitors: safeParse(row[3], [])
+      competitors: safeParse(row[3], []),
+      password:    row[5] || ''
     };
   });
 
@@ -311,7 +313,7 @@ function _archiveEvent(ss, eventId) {
   var archiveSheet = ss.getSheetByName('ArchivedEvents');
   if (!archiveSheet) {
     archiveSheet = ss.insertSheet('ArchivedEvents');
-    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'ArchivedAt'];
+    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password', 'ArchivedAt'];
     archiveSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     archiveSheet.getRange(1, 1, 1, headers.length)
       .setFontWeight('bold')
@@ -321,7 +323,7 @@ function _archiveEvent(ss, eventId) {
   }
 
   // Copy to ArchivedEvents with timestamp
-  var archiveRow = rowData.slice(0, 5);
+  var archiveRow = rowData.slice(0, 6);
   archiveRow.push(new Date().toISOString());
   archiveSheet.getRange(archiveSheet.getLastRow() + 1, 1, 1, archiveRow.length).setValues([archiveRow]);
 
@@ -357,7 +359,7 @@ function _restoreEvent(ss, eventId) {
   var sheet = ss.getSheetByName('Events') || ss.getSheetByName('_Events');
   if (!sheet) {
     sheet = ss.insertSheet('Events');
-    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated'];
+    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password'];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.getRange(1, 1, 1, headers.length)
       .setFontWeight('bold')
@@ -366,8 +368,8 @@ function _restoreEvent(ss, eventId) {
     sheet.setFrozenRows(1);
   }
 
-  // Copy back (first 5 columns: ID, Name, Stages, Competitors, Updated)
-  var restoreRow = rowData.slice(0, 5);
+  // Copy back (first 6 columns: ID, Name, Stages, Competitors, Updated, Password)
+  var restoreRow = rowData.slice(0, 6);
   restoreRow[4] = new Date().toISOString(); // update timestamp
   sheet.getRange(sheet.getLastRow() + 1, 1, 1, restoreRow.length).setValues([restoreRow]);
 

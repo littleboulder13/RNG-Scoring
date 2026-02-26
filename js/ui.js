@@ -129,7 +129,7 @@ function renderEventOverlay() {
         cardsEl.innerHTML = events.map(e => `
             <div class="event-card">
                 <div class="event-card-info">
-                    <h3>${e.name}</h3>
+                    <h3>${e.password ? '🔒 ' : ''}${e.name}</h3>
                     <div class="event-card-meta">
                         \uD83C\uDFAF ${e.stages.length} stage${e.stages.length !== 1 ? 's' : ''}
                         &nbsp;·&nbsp; \uD83D\uDC65 ${e.competitors.length} shooter${e.competitors.length !== 1 ? 's' : ''}
@@ -204,6 +204,7 @@ function openEventEditor(eventId) {
     // Populate fields
     $('event-editor-title').textContent = `Edit: ${ev.name}`;
     $('edit-event-name').value = ev.name;
+    $('edit-event-password').value = ev.password || '';
     renderEditCompetitorsList();
     renderEditStagesList();
 
@@ -227,7 +228,8 @@ function saveEventEditorFields() {
     if (!editingEventId) return;
     const name = $('edit-event-name').value.trim();
     if (!name) return;
-    updateEvent(editingEventId, { name });
+    const password = ($('edit-event-password').value || '').trim();
+    updateEvent(editingEventId, { name, password });
 }
 
 function renderEditCompetitorsList() {

@@ -102,9 +102,30 @@ function hideEventOverlay() {
 }
 
 function selectEvent(id) {
-    setActiveEvent(id);
-    hideEventOverlay();
-    refreshAfterEventChange();
+    const event = getEventById(id);
+    if (!event) return;
+
+    // Skip password check for admins or events without a password
+    if (!event.password || isAdminLoggedIn()) {
+        setActiveEvent(id);
+        hideEventOverlay();
+        refreshAfterEventChange();
+        return;
+    }
+
+    // Show password prompt
+    promptEventPassword(id);
+}
+
+function promptEventPassword(eventId) {
+    const modal = $('event-password-modal');
+    const input = $('event-password-input');
+    const error = $('event-password-error');
+    input.value = '';
+    error.style.display = 'none';
+    modal.style.display = 'flex';
+    modal.dataset.eventId = eventId;
+    setTimeout(() => input.focus(), 100);
 }
 
 async function refreshAfterEventChange() {
@@ -391,6 +412,31 @@ document.addEventListener('DOMContentLoaded', () => {
     $('settings-pin-submit').addEventListener('click', unlockSettings);
     $('settings-pin-input').addEventListener('keydown', e => { if (e.key === 'Enter') unlockSettings(); });
     $('settings-save-btn').addEventListener('click', saveSettings);
+
+    // --- Event Password modal ---
+    function closeEventPasswordModal() {
+        $('event-password-modal').style.display = 'none';
+    }
+    function submitEventPassword() {
+        const modal = $('event-password-modal');
+        const eventId = modal.dataset.eventId;
+        const event = getEventById(eventId);
+        if (!event) { closeEventPasswordModal(); return; }
+        const entered = $('event-password-input').value;
+        if (entered === event.password) {
+            closeEventPasswordModal();
+            setActiveEvent(eventId);
+            hideEventOverlay();
+            refreshAfterEventChange();
+        } else {
+            $('event-password-error').style.display = 'block';
+        }
+    }
+    $('event-password-submit').addEventListener('click', submitEventPassword);
+    $('event-password-cancel').addEventListener('click', closeEventPasswordModal);
+    $('event-password-close').addEventListener('click', closeEventPasswordModal);
+    $('event-password-input').addEventListener('keydown', e => { if (e.key === 'Enter') submitEventPassword(); });
+    $('event-password-input').addEventListener('input', () => { $('event-password-error').style.display = 'none'; });
 
     // --- Admin login/logout buttons ---
     async function handleAdminToggle() {
