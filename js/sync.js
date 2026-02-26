@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v84';
+const APP_VERSION = 'v85';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxl5_JrmYOV_oOW0COYUlGa_XrEFNT57CHJyTOznHQbO_FivjN_KYv2zkgqbD3N4nwz/exec';
 
 function getSyncUrl() {
@@ -245,43 +245,77 @@ async function autoPullEvents() {
     if (!navigator.onLine) return;
     try {
         const data = await _fetchFromAppsScript('pullEvents');
-        if (!data.events || !data.events.length) return;
+        const cloudEvents = (data && data.events) ? data.events : [];
 
         const local = getEvents();
         let changed = false;
 
-        for (const remote of data.events) {
-            const idx = local.findIndex(e => e.id === remote.id);
+        // Cloud is source of truth — build a set of cloud event IDs
+        const cloudIds = new Set(cloudEvents.map(e => e.id));
+
+        // Remove local events that no longer exist in the cloud
+        const filtered = local.filter(e => {
+            if (!cloudIds.has(e.id)) { changed = true; return false; }
+            return true;
+        });
+
+        // Add or update events from cloud
+        for (const remote of cloudEvents) {
+            const idx = filtered.findIndex(e => e.id === remote.id);
             if (idx === -1) {
-                local.push(remote);
+                filtered.push(remote);
                 changed = true;
             } else {
-                // Update if remote has newer data
-                if (local[idx].name !== remote.name ||
-                    JSON.stringify(local[idx].stages) !== JSON.stringify(remote.stages) ||
-                    JSON.stringify(local[idx].competitors) !== JSON.stringify(remote.competitors)) {
-                    local[idx].name = remote.name;
-                    local[idx].stages = remote.stages;
-                    local[idx].competitors = remote.competitors;
+                // Update if remote has newer data (including password)
+                if (filtered[idx].name !== remote.name ||
+                    filtered[idx].password !== (remote.password || '') ||
+                    JSON.stringify(filtered[idx].stages) !== JSON.stringify(remote.stages) ||
+                    JSON.stringify(filtered[idx].competitors) !== JSON.stringify(remote.competitors)) {
+                    filtered[idx].name = remote.name;
+                    filtered[idx].stages = remote.stages;
+                    filtered[idx].competitors = remote.competitors;
+                    filtered[idx].password = remote.password || '';
                     changed = true;
                 }
             }
         }
 
-        if (changed) saveEvents(local);
+        if (changed) {
+            saveEvents(filtered);
 
-        // Also pull archived events silently
+            // Clear active event if it was removed from the cloud
+            const activeId = getActiveEventId();
+            if (activeId && !cloudIds.has(activeId)) {
+                clearActiveEvent();
+            }
+        }
+
+        // Also pull archived events silently — cloud is source of truth
         try {
             const archiveData = await _fetchFromAppsScript('pullArchivedEvents');
-            if (archiveData.events && archiveData.events.length) {
-                const localArchived = getArchivedEvents();
-                for (const remote of archiveData.events) {
-                    if (!localArchived.find(e => e.id === remote.id)) {
-                        localArchived.push(remote);
-                        changed = true;
-                    }
+            const cloudArchived = (archiveData && archiveData.events) ? archiveData.events : [];
+            const localArchived = getArchivedEvents();
+
+            const cloudArchiveIds = new Set(cloudArchived.map(e => e.id));
+            let archiveChanged = false;
+
+            // Remove local archived events not in cloud
+            const filteredArchived = localArchived.filter(e => {
+                if (!cloudArchiveIds.has(e.id)) { archiveChanged = true; return false; }
+                return true;
+            });
+
+            // Add new archived events from cloud
+            for (const remote of cloudArchived) {
+                if (!filteredArchived.find(e => e.id === remote.id)) {
+                    filteredArchived.push(remote);
+                    archiveChanged = true;
                 }
-                if (changed) saveArchivedEvents(localArchived);
+            }
+
+            if (archiveChanged) {
+                saveArchivedEvents(filteredArchived);
+                changed = true;
             }
         } catch (_) { /* ignore archive pull errors silently */ }
 
