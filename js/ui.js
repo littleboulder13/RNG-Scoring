@@ -151,9 +151,13 @@ function renderEventOverlay() {
     const cardsEl = $('event-cards');
     if (!cardsEl) return;
 
-    // Always sync version badge from JS constant (survives stale HTML cache)
-    const versionEl = $('app-version');
-    if (versionEl && typeof APP_VERSION !== 'undefined') versionEl.textContent = APP_VERSION;
+    // Always sync version badges from JS constant (survives stale HTML cache)
+    if (typeof APP_VERSION !== 'undefined') {
+        const versionEl = $('app-version');
+        if (versionEl) versionEl.textContent = APP_VERSION;
+        const versionHeader = $('app-version-header');
+        if (versionHeader) versionHeader.textContent = APP_VERSION;
+    }
 
     const events = getEvents();
 

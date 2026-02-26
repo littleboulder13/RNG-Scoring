@@ -55,6 +55,17 @@ header h1 {
     box-shadow: 0 1px 4px rgba(0,0,0,0.2);
 }
 
+.app-version-badge {
+    font-size: 0.65rem;
+    color: #ff0;
+    background: rgba(0,0,0,0.35);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    align-self: center;
+}
+
 .status {
     display: flex;
     align-items: center;

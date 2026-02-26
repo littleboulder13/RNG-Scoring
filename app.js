@@ -62,6 +62,11 @@ async function init() {
     }
 
     updateOnlineStatus();
+
+    // Force version badge on scoring page header (independent of overlay)
+    const vh = document.getElementById('app-version-header');
+    if (vh && typeof APP_VERSION !== 'undefined') vh.textContent = APP_VERSION;
+
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
     window.addEventListener('online', async () => {
