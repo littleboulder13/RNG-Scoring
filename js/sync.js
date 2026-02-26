@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v91';
+const APP_VERSION = 'v92';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxl5_JrmYOV_oOW0COYUlGa_XrEFNT57CHJyTOznHQbO_FivjN_KYv2zkgqbD3N4nwz/exec';
 
 function getSyncUrl() {
@@ -124,9 +124,9 @@ function _postToAppsScript(payload, queryString) {
             try { resolve(JSON.parse(xhr.responseText)); }
             catch (_) { resolve({ _raw: xhr.responseText }); }
         };
-        xhr.onerror = function () { reject(new Error('Network request failed')); };
-        xhr.ontimeout = function () { reject(new Error('Request timed out')); };
-        xhr.timeout = 30000;
+        xhr.onerror = function () { reject(new Error('XHR POST onerror (readyState=' + xhr.readyState + ', status=' + xhr.status + ')')); };
+        xhr.ontimeout = function () { reject(new Error('XHR POST timeout after 15s')); };
+        xhr.timeout = 15000;
         xhr.send(JSON.stringify(payload));
     });
 }
@@ -147,14 +147,62 @@ function _fetchFromAppsScript(action) {
             try {
                 resolve(JSON.parse(xhr.responseText));
             } catch (_) {
-                reject(new Error('Invalid response: ' + xhr.responseText.substring(0, 200)));
+                reject(new Error('Invalid JSON (status ' + xhr.status + '): ' + xhr.responseText.substring(0, 200)));
             }
         };
-        xhr.onerror = function () { reject(new Error('Network request failed')); };
-        xhr.ontimeout = function () { reject(new Error('Request timed out')); };
-        xhr.timeout = 30000;
+        xhr.onerror = function () { reject(new Error('XHR onerror (readyState=' + xhr.readyState + ', status=' + xhr.status + ')')); };
+        xhr.ontimeout = function () { reject(new Error('XHR timeout after 10s')); };
+        xhr.timeout = 10000;
         xhr.send();
     });
+}
+
+/* --- Manual Pull from Cloud — diagnostic button on event overlay --- */
+async function manualPullFromCloud() {
+    const btn = $('pull-cloud-btn');
+    const status = $('pull-status');
+    if (btn) btn.disabled = true;
+    if (status) status.textContent = 'Pulling…';
+
+    const url = getSyncUrl() + '?action=pullEvents';
+
+    try {
+        const data = await _fetchFromAppsScript('pullEvents');
+
+        if (!data || !Array.isArray(data.events)) {
+            const raw = JSON.stringify(data).substring(0, 300);
+            if (status) { status.textContent = '✗ Bad response: ' + raw; status.style.color = '#f44'; }
+            if (btn) btn.disabled = false;
+            return;
+        }
+
+        // Merge into local storage (cloud is source of truth)
+        const local = getEvents();
+        const cloudIds = new Set(data.events.map(e => e.id));
+        const merged = local.filter(e => cloudIds.has(e.id));
+
+        for (const remote of data.events) {
+            const idx = merged.findIndex(e => e.id === remote.id);
+            if (idx === -1) {
+                merged.push(remote);
+            } else {
+                merged[idx].name = remote.name;
+                merged[idx].stages = remote.stages;
+                merged[idx].competitors = remote.competitors;
+                merged[idx].password = remote.password || '';
+            }
+        }
+
+        saveEvents(merged);
+        renderEventOverlay();
+        if (status) { status.textContent = '✓ Got ' + data.events.length + ' event(s)'; status.style.color = '#4f4'; }
+        showSyncToast('✓ Pulled ' + data.events.length + ' event(s)');
+    } catch (err) {
+        if (status) { status.textContent = '✗ ' + err.message; status.style.color = '#f44'; }
+        showSyncToast('✗ Pull failed: ' + err.message, true);
+    } finally {
+        if (btn) btn.disabled = false;
+    }
 }
 
 function updateSyncStatus() {

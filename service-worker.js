@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rng-scoring-v91';
+const CACHE_NAME = 'rng-scoring-v92';
 const urlsToCache = [
     './',
     './index.html',
@@ -30,23 +30,9 @@ self.addEventListener('install', (event) => {
 self.addEventListener('fetch', (event) => {
     const url = event.request.url;
 
-    // API calls: pass through to network, no caching.
-    // MUST call respondWith (not just return) due to iOS WebKit bug
-    // where return; without respondWith breaks cross-origin XHR.
-    // .catch() prevents respondWith from throwing if the fetch fails.
+    // API calls: do NOT intercept — let the browser handle natively.
+    // Previous attempts to respondWith(fetch(...)) hung on iOS PWA.
     if (url.includes('script.google.com') || url.includes('googleusercontent.com')) {
-        // Use fresh fetch(url) for GET — avoids iOS WebKit bugs with cloned
-        // cross-origin requests. credentials:'omit' avoids redirect issues.
-        const fetchOpts = event.request.method === 'GET'
-            ? fetch(event.request.url, { redirect: 'follow', credentials: 'omit' })
-            : fetch(event.request.clone());
-
-        event.respondWith(
-            fetchOpts.catch(err => new Response(
-                JSON.stringify({ error: err.message || 'network' }),
-                { status: 502, headers: { 'Content-Type': 'application/json' } }
-            ))
-        );
         return;
     }
 
