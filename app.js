@@ -50,8 +50,13 @@ async function init() {
             await migrateScoresToEvent(migratedEventId);
         }
 
-        // Show overlay or refresh based on active event
-        if (getActiveEvent()) {
+        // Show overlay or refresh based on active event and saved view state
+        const savedView = sessionStorage.getItem('rng_current_view');
+        if (savedView === 'events') {
+            // User was on events page — stay there
+            if (getActiveEvent()) await refreshAfterEventChange();
+            showEventOverlay();
+        } else if (getActiveEvent()) {
             await refreshAfterEventChange();
         } else {
             showEventOverlay();
@@ -113,12 +118,14 @@ if ('serviceWorker' in navigator) {
    Event Overlay — Select / Create / Delete Events
    ============================================================= */
 function showEventOverlay() {
+    sessionStorage.setItem('rng_current_view', 'events');
     renderEventOverlay();
     $('event-overlay').style.display = 'flex';
     $('active-event-bar').style.display = 'none';
 }
 
 function hideEventOverlay() {
+    sessionStorage.setItem('rng_current_view', 'scoring');
     $('event-overlay').style.display = 'none';
 }
 
