@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rng-scoring-v87';
+const CACHE_NAME = 'rng-scoring-v88';
 const urlsToCache = [
     './',
     './index.html',
@@ -30,9 +30,10 @@ self.addEventListener('install', (event) => {
 self.addEventListener('fetch', (event) => {
     const url = event.request.url;
 
-    // Explicitly pass API calls through to network (don't cache)
+    // Let API calls bypass the service worker entirely — do NOT use respondWith()
+    // Cross-origin redirects (script.google.com → googleusercontent.com) produce
+    // opaque responses that cause respondWith() to throw TypeError: Load failed
     if (url.includes('script.google.com') || url.includes('googleusercontent.com')) {
-        event.respondWith(fetch(event.request));
         return;
     }
 
