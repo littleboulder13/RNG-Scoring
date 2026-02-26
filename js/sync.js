@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v94';
+const APP_VERSION = 'v95';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxl5_JrmYOV_oOW0COYUlGa_XrEFNT57CHJyTOznHQbO_FivjN_KYv2zkgqbD3N4nwz/exec';
 
 function getSyncUrl() {
@@ -131,11 +131,51 @@ function _postToAppsScript(payload, queryString) {
     });
 }
 
-/* --- Helper: Pull data from Apps Script via JSONP (primary) + XHR (fallback) --- */
-/* JSONP bypasses CORS entirely — script tags don't enforce same-origin.    */
-/* Falls back to XHR GET on desktop where CORS works fine.                  */
+/* --- Helper: Pull data from Apps Script --- */
+/* Tries 3 methods in order (all bypass different iOS restrictions):        */
+/*   1. iframe+postMessage (bypasses CORS, cookies, tracking)               */
+/*   2. JSONP (bypasses CORS via script tag)                                */
+/*   3. XHR GET (works on desktop)                                          */
 function _fetchFromAppsScript(action) {
-    return _jsonpFetch(action).catch(() => _xhrFetch(action));
+    return _iframeFetch(action)
+        .catch(() => _jsonpFetch(action))
+        .catch(() => _xhrFetch(action));
+}
+
+function _iframeFetch(action) {
+    return new Promise((resolve, reject) => {
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'display:none;width:0;height:0;border:0;';
+        let done = false;
+
+        const timer = setTimeout(() => {
+            if (done) return;
+            done = true; cleanup();
+            reject(new Error('iframe timeout'));
+        }, 12000);
+
+        function cleanup() {
+            clearTimeout(timer);
+            window.removeEventListener('message', onMessage);
+            if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+        }
+
+        function onMessage(e) {
+            // Accept messages from Google domains only
+            if (!e.origin || !e.origin.includes('google')) return;
+            if (done) return;
+            done = true; cleanup();
+            try {
+                resolve(JSON.parse(e.data));
+            } catch (_) {
+                reject(new Error('Invalid iframe data'));
+            }
+        }
+
+        window.addEventListener('message', onMessage);
+        iframe.src = getSyncUrl() + '?action=' + encodeURIComponent(action) + '&mode=iframe';
+        document.body.appendChild(iframe);
+    });
 }
 
 function _jsonpFetch(action) {
@@ -204,31 +244,38 @@ async function manualPullFromCloud() {
         if (status) { status.innerHTML = msg; status.style.color = color || '#aaa'; }
     }
 
-    // Step 1: Try JSONP (bypasses CORS — requires Apps Script redeployment)
-    log('Step 1/2: Trying JSONP…');
-    let jsonpErr = null;
+    const errors = [];
+
+    // Step 1: iframe+postMessage (most reliable on iOS)
+    log('1/3: Trying iframe…');
+    try {
+        const data = await _iframeFetch('pullEvents');
+        log('✓ iframe succeeded!', '#4f4');
+        return handlePullData(data, status, btn);
+    } catch (e) { errors.push('iframe: ' + e.message); }
+
+    // Step 2: JSONP
+    log(errors[0] + '<br>2/3: Trying JSONP…', '#fa0');
     try {
         const data = await _jsonpFetch('pullEvents');
         log('✓ JSONP succeeded!', '#4f4');
         return handlePullData(data, status, btn);
-    } catch (e) {
-        jsonpErr = e.message;
-        log('JSONP failed: ' + jsonpErr + '<br>Step 2/2: Trying XHR…', '#fa0');
-    }
+    } catch (e) { errors.push('JSONP: ' + e.message); }
 
-    // Step 2: Fallback to XHR (works on desktop, CORS-blocked on iOS PWA)
+    // Step 3: XHR
+    log(errors.join('<br>') + '<br>3/3: Trying XHR…', '#fa0');
     try {
         const data = await _xhrFetch('pullEvents');
         log('✓ XHR succeeded!', '#4f4');
         return handlePullData(data, status, btn);
-    } catch (e) {
-        const xhrErr = e.message;
-        log('✗ Both methods failed:<br>JSONP: ' + jsonpErr + '<br>XHR: ' + xhrErr +
-            '<br><br>⚠ Did you redeploy the Apps Script?<br>' +
-            '<span style="font-size:0.65rem;color:#999;">Open Apps Script → Deploy → Manage → Edit → New version → Deploy</span>', '#f44');
-        showSyncToast('✗ Pull failed', true);
-        if (btn) btn.disabled = false;
-    }
+    } catch (e) { errors.push('XHR: ' + e.message); }
+
+    // All failed
+    log('✗ All 3 methods failed:<br>' + errors.join('<br>') +
+        '<br><br>⚠ Redeploy Apps Script &amp; check Safari settings:<br>' +
+        '<span style="font-size:0.65rem;color:#999;">Settings → Safari → turn OFF "Prevent Cross-Site Tracking" &amp; "Block All Cookies"</span>', '#f44');
+    showSyncToast('✗ Pull failed', true);
+    if (btn) btn.disabled = false;
 }
 
 function handlePullData(data, statusEl, btn) {

@@ -50,6 +50,17 @@ function doGet(e) {
   else if (action === 'pullArchivedEvents') result = _pullArchivedEventsData();
   else result = { status: 'ok', message: 'Stilly RNG sync endpoint is running' };
 
+  // iframe+postMessage mode — bypasses CORS, cookies, tracking restrictions
+  // The iframe loads as a normal page navigation, then sends data back via postMessage.
+  var mode = (e && e.parameter && e.parameter.mode) || '';
+  if (mode === 'iframe') {
+    var html = '<html><body><script>'
+      + 'parent.postMessage(' + JSON.stringify(JSON.stringify(result)) + ', "*");'
+      + '</' + 'script></body></html>';
+    return HtmlService.createHtmlOutput(html)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+
   // JSONP support — bypasses CORS issues on iOS PWA standalone mode
   if (callback && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(callback)) {
     return ContentService
