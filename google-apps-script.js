@@ -717,9 +717,10 @@ function _getConfigSheet(ss) {
 function _getConfig(ss, key) {
   var sheet = _getConfigSheet(ss);
   if (sheet.getLastRow() < 2) return null;
+  var keyLower = key.toLowerCase();
   var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
   for (var i = 0; i < data.length; i++) {
-    if (data[i][0] === key) return data[i][1];
+    if (String(data[i][0]).toLowerCase() === keyLower) return data[i][1];
   }
   return null;
 }
