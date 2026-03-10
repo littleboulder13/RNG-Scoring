@@ -1,26 +1,39 @@
 /**
  * =============================================================
- * Stilly Run 'N Gun — Google Apps Script
+ * Stilly Run 'N Gun — Google Apps Script (v105)
+ *
+ * Each event gets its own Google Spreadsheet in a Drive folder.
+ * The master spreadsheet stores event metadata (Events tab) and
+ * config (_Config tab with 'folderId' key for the Drive folder).
  *
  * Handles:
- *   POST action: 'syncScores'  — appends scores to event sheet
- *   POST action: 'pushEvent'   — saves event config to Events sheet
- *   GET  action: 'pullEvents'  — returns all events as JSON
+ *   POST 'syncScores'           — write scores to event's own spreadsheet
+ *   POST 'pushEvent'            — save event config + create per-event spreadsheet
+ *   POST 'archiveEvent'         — move to ArchivedEvents
+ *   POST 'restoreEvent'         — restore from ArchivedEvents
+ *   POST 'permanentlyDeleteEvent' — trash event spreadsheet + remove row
+ *   POST/GET 'pullEvents'       — return all events as JSON
+ *   POST/GET 'pullArchivedEvents'
+ *   POST/GET 'pullDeletedEventIds'
+ *   POST/GET 'pullConfig'
+ *   POST 'pushConfig'
  *
- * SETUP: Deploy → Web app → Execute as Me → Anyone → Deploy
+ * SETUP:
+ *   1. Create a Google Drive folder for event spreadsheets
+ *   2. In the _Config tab, set key='folderId' value='<your folder ID>'
+ *      (folder ID is the string after /folders/ in the Drive URL)
+ *   3. Deploy → Web app → Execute as Me → Anyone → Deploy
  * =============================================================
  */
 
 function doPost(e) {
   try {
-    // Check URL query parameter first (reliable even if body is garbled)
     var paramAction = (e && e.parameter && e.parameter.action) || '';
     if (paramAction === 'pullEvents') return _pullEvents();
     if (paramAction === 'pullConfig') return _pullConfig();
     if (paramAction === 'pullArchivedEvents') return _pullArchivedEvents();
     if (paramAction === 'pullDeletedEventIds') return _pullDeletedEventIds();
 
-    // Parse body for actions that need data
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var data = JSON.parse(e.postData.contents);
     var action = data.action || 'syncScores';
@@ -33,7 +46,6 @@ function doPost(e) {
     if (action === 'restoreEvent') return _restoreEvent(ss, data.eventId);
     if (action === 'permanentlyDeleteEvent') return _permanentlyDeleteEvent(ss, data.eventId, data.eventName, data.stages);
 
-    // Default: syncScores
     return _syncScores(ss, data);
 
   } catch (err) {
@@ -43,31 +55,118 @@ function doPost(e) {
 
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) || 'status';
-
-  if (action === 'pullEvents') {
-    return _pullEvents();
-  }
-
-  if (action === 'pullConfig') {
-    return _pullConfig();
-  }
-
-  if (action === 'pullArchivedEvents') {
-    return _pullArchivedEvents();
-  }
-
-  if (action === 'pullDeletedEventIds') {
-    return _pullDeletedEventIds();
-  }
-
+  if (action === 'pullEvents') return _pullEvents();
+  if (action === 'pullConfig') return _pullConfig();
+  if (action === 'pullArchivedEvents') return _pullArchivedEvents();
+  if (action === 'pullDeletedEventIds') return _pullDeletedEventIds();
   return _jsonResponse({ status: 'ok', message: 'Stilly RNG sync endpoint is running' });
 }
 
-/* --- Score Sync (one tab per stage, all competitors listed) --- */
-/* If a competitor already has a score on a stage, new scores are   */
-/* placed in columns to the right instead of overwriting.          */
+/* =============================================================
+   Helper: Get the Google Drive folder for event spreadsheets.
+   Reads 'folderId' from _Config. Falls back to Drive root.
+   ============================================================= */
+function _getEventsFolder(ss) {
+  var folderId = _getConfig(ss, 'folderId');
+  if (folderId) {
+    try { return DriveApp.getFolderById(folderId); }
+    catch (_) { /* folder not found — fall through */ }
+  }
+  return DriveApp.getRootFolder();
+}
+
+/* =============================================================
+   Helper: Get or create the per-event spreadsheet.
+   Looks up SpreadsheetId in the Events/ArchivedEvents row.
+   If missing, creates a new spreadsheet in the events folder.
+   ============================================================= */
+function _getEventSpreadsheet(ss, eventId, eventName) {
+  // Look up existing SpreadsheetId from the Events row
+  var sheetId = _getEventSpreadsheetId(ss, eventId);
+  if (sheetId) {
+    try { return SpreadsheetApp.openById(sheetId); }
+    catch (_) { /* spreadsheet was deleted — recreate below */ }
+  }
+
+  // Create a new spreadsheet for this event
+  var newSS = SpreadsheetApp.create(eventName || 'Unnamed Event');
+  var file = DriveApp.getFileById(newSS.getId());
+  var folder = _getEventsFolder(ss);
+
+  // Move into the events folder (remove from root if different)
+  folder.addFile(file);
+  var parents = file.getParents();
+  while (parents.hasNext()) {
+    var parent = parents.next();
+    if (parent.getId() !== folder.getId()) {
+      parent.removeFile(file);
+    }
+  }
+
+  // Delete the default "Sheet1" tab
+  var defaultSheet = newSS.getSheetByName('Sheet1');
+  if (defaultSheet && newSS.getSheets().length > 0) {
+    // Can't delete if it's the only sheet; we'll add a stage tab first in _syncScores
+    // For now just rename it
+    defaultSheet.setName('_info');
+    defaultSheet.getRange(1, 1).setValue('Event: ' + eventName);
+    defaultSheet.getRange(2, 1).setValue('Created: ' + new Date().toISOString());
+  }
+
+  // Store the SpreadsheetId back in the Events row
+  _setEventSpreadsheetId(ss, eventId, newSS.getId());
+
+  return newSS;
+}
+
+/* Look up SpreadsheetId column value for an event */
+function _getEventSpreadsheetId(ss, eventId) {
+  var sheet = ss.getSheetByName('Events') || ss.getSheetByName('_Events');
+  if (!sheet || sheet.getLastRow() < 2) return null;
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var ssIdCol = -1;
+  for (var c = 0; c < headers.length; c++) {
+    if (String(headers[c]).toLowerCase().replace(/\s+/g, '') === 'spreadsheetid') { ssIdCol = c; break; }
+  }
+  if (ssIdCol === -1) return null;
+  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  for (var r = 0; r < data.length; r++) {
+    if (data[r][0] === eventId) return data[r][ssIdCol] || null;
+  }
+  return null;
+}
+
+/* Store SpreadsheetId in the Events row for an event */
+function _setEventSpreadsheetId(ss, eventId, spreadsheetId) {
+  var sheet = ss.getSheetByName('Events') || ss.getSheetByName('_Events');
+  if (!sheet) return;
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var ssIdCol = -1;
+  for (var c = 0; c < headers.length; c++) {
+    if (String(headers[c]).toLowerCase().replace(/\s+/g, '') === 'spreadsheetid') { ssIdCol = c + 1; break; }
+  }
+  // If SpreadsheetId column doesn't exist, add it
+  if (ssIdCol === -1) {
+    ssIdCol = headers.length + 1;
+    sheet.getRange(1, ssIdCol).setValue('SpreadsheetId');
+    sheet.getRange(1, ssIdCol).setFontWeight('bold').setBackground('#1565c0').setFontColor('#ffffff');
+  }
+  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
+  for (var r = 0; r < data.length; r++) {
+    if (data[r][0] === eventId) {
+      sheet.getRange(r + 2, ssIdCol).setValue(spreadsheetId);
+      return;
+    }
+  }
+}
+
+/* =============================================================
+   Score Sync — writes to the event's own spreadsheet.
+   Each stage is a tab. Duplicate scores append to the right.
+   ============================================================= */
 function _syncScores(ss, data) {
   var scores = Array.isArray(data.scores) ? data.scores : [];
+  var eventId = data.eventId || '';
   var eventName = data.eventName || 'Unknown Event';
   var competitors = Array.isArray(data.competitors) ? data.competitors : [];
   var stages = Array.isArray(data.stages) ? data.stages : [];
@@ -76,18 +175,25 @@ function _syncScores(ss, data) {
     return _jsonResponse({ success: false, error: 'No scores provided' });
   }
 
+  // Open (or create) the event's own spreadsheet
+  var eventSS;
+  if (eventId) {
+    eventSS = _getEventSpreadsheet(ss, eventId, eventName);
+  } else {
+    // Fallback: no eventId sent — use the master spreadsheet (legacy)
+    eventSS = ss;
+  }
+
   var BASE_HEADERS = ['#', 'Shooter', 'Division'];
   var SCORE_HEADERS = ['Time (s)', 'Wait Time (m:ss)', 'Targets Not Neutralized', 'Notes'];
-  var SCORE_COLS = SCORE_HEADERS.length; // 4 columns per score block
+  var SCORE_COLS = SCORE_HEADERS.length;
 
-  // Helper: format wait time
   function fmtWait(totalSec) {
     var m = Math.floor((totalSec || 0) / 60);
     var s = (totalSec || 0) % 60;
     return m + ':' + ('0' + s).slice(-2);
   }
 
-  // Group scores by stage name
   var scoresByStage = {};
   for (var i = 0; i < scores.length; i++) {
     var stageName = scores[i].stage || 'Unknown Stage';
@@ -95,7 +201,6 @@ function _syncScores(ss, data) {
     scoresByStage[stageName].push(scores[i]);
   }
 
-  // Collect all stage names we need tabs for (event stages + any in scores)
   var stageNames = [];
   var stageSet = {};
   for (var si = 0; si < stages.length; si++) {
@@ -110,19 +215,18 @@ function _syncScores(ss, data) {
 
   for (var si2 = 0; si2 < stageNames.length; si2++) {
     var stage = stageNames[si2];
-    var tabName = (eventName + ' - ' + stage).substring(0, 100);
+    // Tab name: just the stage name (no event prefix — it's already its own spreadsheet)
+    var tabName = stage.substring(0, 100);
 
-    var sheet = ss.getSheetByName(tabName);
+    var sheet = eventSS.getSheetByName(tabName);
     var isNew = false;
     if (!sheet) {
-      sheet = ss.insertSheet(tabName);
+      sheet = eventSS.insertSheet(tabName);
       isNew = true;
     }
 
     var stageScores = scoresByStage[stage] || [];
 
-    // --- Read existing data (each shooter may already have multiple score blocks) ---
-    // existingMap: { shooterName: { division: '', scores: [{time,waitTime,tnt,notes}, ...] } }
     var existingMap = {};
     if (!isNew && sheet.getLastRow() >= 2) {
       var numCols = Math.max(sheet.getLastColumn(), BASE_HEADERS.length + SCORE_COLS);
@@ -131,7 +235,6 @@ function _syncScores(ss, data) {
         var exName = String(existData[ex][1]).trim();
         if (!exName) continue;
         var exScores = [];
-        // Walk score blocks (each starts at column index 3 + block * 4)
         for (var b = 0; b < 50; b++) {
           var off = BASE_HEADERS.length + b * SCORE_COLS;
           if (off >= numCols) break;
@@ -148,7 +251,6 @@ function _syncScores(ss, data) {
       }
     }
 
-    // --- Append new scores (never overwrite — add as new block to the right) ---
     for (var ns = 0; ns < stageScores.length; ns++) {
       var sc = stageScores[ns];
       var pn = sc.playerName || '';
@@ -165,7 +267,6 @@ function _syncScores(ss, data) {
       existingMap[pn].scores.push(newScore);
     }
 
-    // --- Build full competitor list (event competitors + anyone with scores) ---
     var compList = [];
     var compSet = {};
     for (var ci = 0; ci < competitors.length; ci++) {
@@ -182,7 +283,6 @@ function _syncScores(ss, data) {
       }
     }
 
-    // --- Determine the max number of score blocks across all shooters ---
     var maxBlocks = 1;
     for (var mb in existingMap) {
       if (existingMap[mb].scores.length > maxBlocks) {
@@ -190,7 +290,6 @@ function _syncScores(ss, data) {
       }
     }
 
-    // --- Build dynamic headers: base + N score blocks ---
     var headers = BASE_HEADERS.slice();
     for (var h = 0; h < maxBlocks; h++) {
       for (var sh = 0; sh < SCORE_HEADERS.length; sh++) {
@@ -199,7 +298,6 @@ function _syncScores(ss, data) {
     }
     var totalCols = headers.length;
 
-    // --- Build rows ---
     var rows = [];
     for (var ri = 0; ri < compList.length; ri++) {
       var comp = compList[ri];
@@ -215,7 +313,6 @@ function _syncScores(ss, data) {
       rows.push(row);
     }
 
-    // --- Write the sheet (clear and rewrite) ---
     sheet.clear();
     sheet.getRange(1, 1, 1, totalCols).setValues([headers]);
     sheet.getRange(1, 1, 1, totalCols)
@@ -238,17 +335,18 @@ function _syncScores(ss, data) {
   return _jsonResponse({ success: true, count: totalSynced });
 }
 
-/* --- Push Event Config --- */
+/* =============================================================
+   Push Event Config — creates per-event spreadsheet if new
+   ============================================================= */
 function _pushEvent(ss, ev) {
   if (!ev || !ev.id) {
     return _jsonResponse({ success: false, error: 'No event data' });
   }
 
-  // Check for existing sheet (support both old and new name)
   var sheet = ss.getSheetByName('Events') || ss.getSheetByName('_Events');
   if (!sheet) {
     sheet = ss.insertSheet('Events');
-    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password'];
+    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password', 'SpreadsheetId'];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.getRange(1, 1, 1, headers.length)
       .setFontWeight('bold')
@@ -257,18 +355,45 @@ function _pushEvent(ss, ev) {
     sheet.setFrozenRows(1);
   }
 
-  // Always ensure headers are correct (fixes column drift)
-  var correctHeaders = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password'];
-  sheet.getRange(1, 1, 1, correctHeaders.length).setValues([correctHeaders]);
+  // Ensure SpreadsheetId column exists
+  var hdrs = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var ssIdCol = -1;
+  for (var c = 0; c < hdrs.length; c++) {
+    if (String(hdrs[c]).toLowerCase().replace(/\s+/g, '') === 'spreadsheetid') { ssIdCol = c; break; }
+  }
+  if (ssIdCol === -1) {
+    ssIdCol = hdrs.length;
+    sheet.getRange(1, ssIdCol + 1).setValue('SpreadsheetId');
+    sheet.getRange(1, ssIdCol + 1).setFontWeight('bold').setBackground('#1565c0').setFontColor('#ffffff');
+  }
 
-  // Find existing row for this event ID
+  // Find existing row
   var dataRange = sheet.getDataRange();
   var values = dataRange.getValues();
   var existingRow = -1;
+  var existingSsId = '';
   for (var r = 1; r < values.length; r++) {
     if (values[r][0] === ev.id) {
-      existingRow = r + 1; // 1-indexed
+      existingRow = r + 1;
+      existingSsId = values[r][ssIdCol] || '';
       break;
+    }
+  }
+
+  // Create event spreadsheet if it doesn't exist yet
+  if (!existingSsId) {
+    var eventSS = _getEventSpreadsheet(ss, ev.id, ev.name || 'Unnamed Event');
+    existingSsId = eventSS.getId();
+  } else {
+    // Rename existing spreadsheet if event name changed
+    try {
+      var existing = SpreadsheetApp.openById(existingSsId);
+      if (existing.getName() !== (ev.name || '')) {
+        existing.rename(ev.name || 'Unnamed Event');
+      }
+    } catch (_) { /* spreadsheet gone, recreate */ 
+      var eventSS2 = _getEventSpreadsheet(ss, ev.id, ev.name || 'Unnamed Event');
+      existingSsId = eventSS2.getId();
     }
   }
 
@@ -278,7 +403,8 @@ function _pushEvent(ss, ev) {
     JSON.stringify(ev.stages || []),
     JSON.stringify(ev.competitors || []),
     new Date().toISOString(),
-    ev.password || ''
+    ev.password || '',
+    existingSsId
   ];
 
   if (existingRow > 0) {
@@ -291,10 +417,12 @@ function _pushEvent(ss, ev) {
     sheet.autoResizeColumn(i);
   }
 
-  return _jsonResponse({ success: true, eventId: ev.id });
+  return _jsonResponse({ success: true, eventId: ev.id, spreadsheetId: existingSsId });
 }
 
-/* --- Pull Events --- */
+/* =============================================================
+   Pull Events
+   ============================================================= */
 function _pullEvents() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Events') || ss.getSheetByName('_Events');
@@ -305,15 +433,12 @@ function _pullEvents() {
 
   var numCols = sheet.getLastColumn();
   var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, numCols).getValues();
-
-  // Read headers to find column positions
   var headers = sheet.getRange(1, 1, 1, numCols).getValues()[0];
   var colIdx = {};
   for (var c = 0; c < headers.length; c++) {
     colIdx[String(headers[c]).toLowerCase().replace(/\s+/g, '')] = c;
   }
 
-  // Safe JSON parse helper — returns fallback if value isn't valid JSON
   function safeParse(val, fallback) {
     if (!val || typeof val !== 'string') return fallback;
     try { return JSON.parse(val); }
@@ -321,32 +446,42 @@ function _pullEvents() {
   }
 
   var events = data.map(function(row) {
-    var idCol   = colIdx['eventid'] !== undefined ? colIdx['eventid'] : 0;
-    var nameCol = colIdx['name'] !== undefined ? colIdx['name'] : 1;
-    // Stages/Competitors could be at different positions depending on whether Date column exists
-    var stagesCol = colIdx['stages'] !== undefined ? colIdx['stages'] : (numCols >= 6 ? 3 : 2);
-    var compCol   = colIdx['competitors'] !== undefined ? colIdx['competitors'] : (numCols >= 6 ? 4 : 3);
+    var idCol     = colIdx['eventid'] !== undefined ? colIdx['eventid'] : 0;
+    var nameCol   = colIdx['name'] !== undefined ? colIdx['name'] : 1;
+    var stagesCol = colIdx['stages'] !== undefined ? colIdx['stages'] : 2;
+    var compCol   = colIdx['competitors'] !== undefined ? colIdx['competitors'] : 3;
+    var pwCol     = colIdx['password'] !== undefined ? colIdx['password'] : 5;
+    var ssIdCol   = colIdx['spreadsheetid'] !== undefined ? colIdx['spreadsheetid'] : -1;
 
-    var pwCol = colIdx['password'] !== undefined ? colIdx['password'] : 5;
     return {
-      id:          row[idCol],
-      name:        row[nameCol],
-      stages:      safeParse(row[stagesCol], []),
-      competitors: safeParse(row[compCol], []),
-      password:    row[pwCol] || ''
+      id:            row[idCol],
+      name:          row[nameCol],
+      stages:        safeParse(row[stagesCol], []),
+      competitors:   safeParse(row[compCol], []),
+      password:      row[pwCol] || '',
+      spreadsheetId: ssIdCol >= 0 ? (row[ssIdCol] || '') : ''
     };
   });
 
   return _jsonResponse({ events: events });
 }
 
-/* --- Archive Event (move from Events → ArchivedEvents) --- */
+/* =============================================================
+   Archive Event — carries SpreadsheetId to archive row
+   ============================================================= */
 function _archiveEvent(ss, eventId) {
   if (!eventId) return _jsonResponse({ success: false, error: 'No eventId' });
 
   var sheet = ss.getSheetByName('Events') || ss.getSheetByName('_Events');
   if (!sheet || sheet.getLastRow() < 2) {
     return _jsonResponse({ success: false, error: 'Events sheet not found or empty' });
+  }
+
+  // Find SpreadsheetId column
+  var hdrs = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var ssIdCol = -1;
+  for (var c = 0; c < hdrs.length; c++) {
+    if (String(hdrs[c]).toLowerCase().replace(/\s+/g, '') === 'spreadsheetid') { ssIdCol = c; break; }
   }
 
   var values = sheet.getDataRange().getValues();
@@ -364,7 +499,7 @@ function _archiveEvent(ss, eventId) {
   var archiveSheet = ss.getSheetByName('ArchivedEvents');
   if (!archiveSheet) {
     archiveSheet = ss.insertSheet('ArchivedEvents');
-    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password', 'ArchivedAt'];
+    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password', 'SpreadsheetId', 'ArchivedAt'];
     archiveSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     archiveSheet.getRange(1, 1, 1, headers.length)
       .setFontWeight('bold')
@@ -373,21 +508,38 @@ function _archiveEvent(ss, eventId) {
     archiveSheet.setFrozenRows(1);
   }
 
-  var archiveRow = rowData.slice(0, 6);
-  archiveRow.push(new Date().toISOString());
+  var archiveRow = [
+    rowData[0],                          // EventID
+    rowData[1],                          // Name
+    rowData[2],                          // Stages
+    rowData[3],                          // Competitors
+    rowData[4],                          // Updated
+    rowData[5],                          // Password
+    ssIdCol >= 0 ? (rowData[ssIdCol] || '') : '',  // SpreadsheetId
+    new Date().toISOString()             // ArchivedAt
+  ];
   archiveSheet.getRange(archiveSheet.getLastRow() + 1, 1, 1, archiveRow.length).setValues([archiveRow]);
   sheet.deleteRow(rowIndex);
 
   return _jsonResponse({ success: true, eventId: eventId });
 }
 
-/* --- Restore Event (move from ArchivedEvents → Events) --- */
+/* =============================================================
+   Restore Event — carries SpreadsheetId back
+   ============================================================= */
 function _restoreEvent(ss, eventId) {
   if (!eventId) return _jsonResponse({ success: false, error: 'No eventId' });
 
   var archiveSheet = ss.getSheetByName('ArchivedEvents');
   if (!archiveSheet || archiveSheet.getLastRow() < 2) {
     return _jsonResponse({ success: false, error: 'ArchivedEvents sheet not found or empty' });
+  }
+
+  // Find SpreadsheetId column in archive
+  var archHdrs = archiveSheet.getRange(1, 1, 1, archiveSheet.getLastColumn()).getValues()[0];
+  var archSsIdCol = -1;
+  for (var c = 0; c < archHdrs.length; c++) {
+    if (String(archHdrs[c]).toLowerCase().replace(/\s+/g, '') === 'spreadsheetid') { archSsIdCol = c; break; }
   }
 
   var values = archiveSheet.getDataRange().getValues();
@@ -405,7 +557,7 @@ function _restoreEvent(ss, eventId) {
   var sheet = ss.getSheetByName('Events') || ss.getSheetByName('_Events');
   if (!sheet) {
     sheet = ss.insertSheet('Events');
-    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password'];
+    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password', 'SpreadsheetId'];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.getRange(1, 1, 1, headers.length)
       .setFontWeight('bold')
@@ -414,15 +566,24 @@ function _restoreEvent(ss, eventId) {
     sheet.setFrozenRows(1);
   }
 
-  var restoreRow = rowData.slice(0, 6);
-  restoreRow[4] = new Date().toISOString();
+  var restoreRow = [
+    rowData[0],                                           // EventID
+    rowData[1],                                           // Name
+    rowData[2],                                           // Stages
+    rowData[3],                                           // Competitors
+    new Date().toISOString(),                             // Updated
+    rowData[5],                                           // Password
+    archSsIdCol >= 0 ? (rowData[archSsIdCol] || '') : '' // SpreadsheetId
+  ];
   sheet.getRange(sheet.getLastRow() + 1, 1, 1, restoreRow.length).setValues([restoreRow]);
   archiveSheet.deleteRow(rowIndex);
 
   return _jsonResponse({ success: true, eventId: eventId });
 }
 
-/* --- Permanently Delete Archived Event --- */
+/* =============================================================
+   Permanently Delete — trashes the event's spreadsheet
+   ============================================================= */
 function _permanentlyDeleteEvent(ss, eventId, eventName, stageNames) {
   if (!eventId) return _jsonResponse({ success: false, error: 'No eventId' });
 
@@ -431,42 +592,44 @@ function _permanentlyDeleteEvent(ss, eventId, eventName, stageNames) {
     return _jsonResponse({ success: false, error: 'ArchivedEvents sheet not found or empty' });
   }
 
+  // Find SpreadsheetId column in archive
+  var archHdrs = archiveSheet.getRange(1, 1, 1, archiveSheet.getLastColumn()).getValues()[0];
+  var archSsIdCol = -1;
+  for (var c = 0; c < archHdrs.length; c++) {
+    if (String(archHdrs[c]).toLowerCase().replace(/\s+/g, '') === 'spreadsheetid') { archSsIdCol = c; break; }
+  }
+
   var values = archiveSheet.getDataRange().getValues();
   var rowToDelete = -1;
+  var spreadsheetId = '';
   for (var r = 1; r < values.length; r++) {
     if (values[r][0] === eventId) {
       rowToDelete = r + 1;
       if (!eventName) eventName = values[r][1];
-      if (!stageNames || !stageNames.length) {
-        try { stageNames = JSON.parse(values[r][2]).map(function(s) { return s.name || s; }); }
-        catch (_) { stageNames = []; }
-      }
+      if (archSsIdCol >= 0) spreadsheetId = values[r][archSsIdCol] || '';
       break;
     }
   }
   if (rowToDelete === -1) return _jsonResponse({ success: false, error: 'Archived event not found' });
 
-  var deletedTabs = [];
-  if (eventName && stageNames && stageNames.length) {
-    for (var i = 0; i < stageNames.length; i++) {
-      var tabName = (eventName + ' - ' + stageNames[i]).substring(0, 100);
-      var scoreSheet = ss.getSheetByName(tabName);
-      if (scoreSheet) {
-        ss.deleteSheet(scoreSheet);
-        deletedTabs.push(tabName);
-      }
-    }
+  // Trash the event's spreadsheet
+  var trashedSpreadsheet = false;
+  if (spreadsheetId) {
+    try {
+      DriveApp.getFileById(spreadsheetId).setTrashed(true);
+      trashedSpreadsheet = true;
+    } catch (_) { /* already gone */ }
   }
 
   archiveSheet.deleteRow(rowToDelete);
-
-  // Record this event ID so other devices can clean up on next pull
   _recordDeletedEvent(ss, eventId);
 
-  return _jsonResponse({ success: true, eventId: eventId, deletedTabs: deletedTabs });
+  return _jsonResponse({ success: true, eventId: eventId, trashedSpreadsheet: trashedSpreadsheet });
 }
 
-/* --- Deleted-Event Tracking (so other devices can clean up) --- */
+/* =============================================================
+   Deleted-Event Tracking
+   ============================================================= */
 function _recordDeletedEvent(ss, eventId) {
   var sheet = ss.getSheetByName('_DeletedEvents');
   if (!sheet) {
@@ -493,7 +656,9 @@ function _pullDeletedEventIds() {
   return _jsonResponse({ deletedEventIds: ids });
 }
 
-/* --- Pull Archived Events --- */
+/* =============================================================
+   Pull Archived Events
+   ============================================================= */
 function _pullArchivedEvents() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('ArchivedEvents');
@@ -523,13 +688,18 @@ function _pullArchivedEvents() {
   });
 }
 
+/* =============================================================
+   JSON Response Helper
+   ============================================================= */
 function _jsonResponse(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-/* --- Config Storage (_Config sheet) --- */
+/* =============================================================
+   Config Storage (_Config sheet)
+   ============================================================= */
 function _getConfigSheet(ss) {
   var sheet = ss.getSheetByName('_Config');
   if (!sheet) {
@@ -571,11 +741,13 @@ function _setConfig(ss, key, value) {
 function _pushConfig(ss, config) {
   if (!config) return _jsonResponse({ success: false, error: 'No config data' });
   if (config.syncUrl) _setConfig(ss, 'syncUrl', config.syncUrl);
+  if (config.folderId) _setConfig(ss, 'folderId', config.folderId);
   return _jsonResponse({ success: true });
 }
 
 function _pullConfig() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var syncUrl = _getConfig(ss, 'syncUrl');
-  return _jsonResponse({ syncUrl: syncUrl || '' });
+  var folderId = _getConfig(ss, 'folderId');
+  return _jsonResponse({ syncUrl: syncUrl || '', folderId: folderId || '' });
 }
