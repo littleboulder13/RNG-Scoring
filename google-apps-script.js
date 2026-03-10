@@ -93,15 +93,8 @@ function _getEventSpreadsheet(ss, eventId, eventName) {
   var file = DriveApp.getFileById(newSS.getId());
   var folder = _getEventsFolder(ss);
 
-  // Move into the events folder (remove from root if different)
-  folder.addFile(file);
-  var parents = file.getParents();
-  while (parents.hasNext()) {
-    var parent = parents.next();
-    if (parent.getId() !== folder.getId()) {
-      parent.removeFile(file);
-    }
-  }
+  // Move into the events folder
+  file.moveTo(folder);
 
   // Delete the default "Sheet1" tab
   var defaultSheet = newSS.getSheetByName('Sheet1');
@@ -113,8 +106,9 @@ function _getEventSpreadsheet(ss, eventId, eventName) {
     defaultSheet.getRange(2, 1).setValue('Created: ' + new Date().toISOString());
   }
 
-  // Store the SpreadsheetId back in the Events row
-  _setEventSpreadsheetId(ss, eventId, newSS.getId());
+  // Store the SpreadsheetId back in the Events row (non-fatal if row doesn't exist yet)
+  try { _setEventSpreadsheetId(ss, eventId, newSS.getId()); }
+  catch (_) { /* row may not exist yet — _pushEvent will write it */ }
 
   return newSS;
 }
@@ -151,6 +145,8 @@ function _setEventSpreadsheetId(ss, eventId, spreadsheetId) {
     sheet.getRange(1, ssIdCol).setValue('SpreadsheetId');
     sheet.getRange(1, ssIdCol).setFontWeight('bold').setBackground('#1565c0').setFontColor('#ffffff');
   }
+  // Guard: no data rows yet — nothing to update
+  if (sheet.getLastRow() < 2) return;
   var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
   for (var r = 0; r < data.length; r++) {
     if (data[r][0] === eventId) {

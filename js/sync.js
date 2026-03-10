@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v105';
+const APP_VERSION = 'v106';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxDwug8yxfGbuqVKWUb7WTZh89NJQzp5ZaIIC3aPs4w4iiWogk0Yvg7M9ASgy70NOkW/exec';
 
 function getSyncUrl() {
@@ -154,7 +154,9 @@ async function pushEventConfig(eventId) {
     try {
         const result = await _postToAppsScript({ action: 'pushEvent', event: ev });
         if (!result || !result.success) {
-            console.warn('Event push response:', JSON.stringify(result).substring(0, 200));
+            console.warn('Event push response:', JSON.stringify(result).substring(0, 300));
+        } else {
+            console.log('Event pushed OK, spreadsheetId:', result.spreadsheetId || '(none)');
         }
     } catch (err) {
         console.warn('Event push failed (will retry):', err.message);
@@ -309,7 +311,7 @@ async function syncScores() {
     if (syncBtn) { syncBtn.disabled = true; syncBtn.textContent = 'Syncing\u2026'; }
 
     try {
-        await _postToAppsScript({
+        const result = await _postToAppsScript({
             action: 'syncScores',
             eventId: event ? event.id : '',
             eventName,
@@ -317,6 +319,10 @@ async function syncScores() {
             competitors,
             stages
         });
+
+        if (result && result.success === false) {
+            throw new Error(result.error || 'Server returned an error');
+        }
 
         for (const s of pending) await markAsSynced(s.id);
         await updateUI();
