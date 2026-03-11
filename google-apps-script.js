@@ -1,6 +1,6 @@
 /**
  * =============================================================
- * Stilly Run 'N Gun — Google Apps Script (v108)
+ * Stilly Run 'N Gun — Google Apps Script (v109)
  *
  * Each event gets its own Google Spreadsheet in a Drive folder.
  * The master spreadsheet stores event metadata (Events tab) and
@@ -235,6 +235,7 @@ function _syncScores(ss, data) {
     if (!stageSet[key]) { stageNames.push(key); stageSet[key] = true; }
   }
 
+  var allScores = {};   // allScores[stageName][playerName] = { time, division }
   var totalSynced = 0;
 
   for (var si2 = 0; si2 < stageNames.length; si2++) {
@@ -292,6 +293,16 @@ function _syncScores(ss, data) {
         existingMap[pn] = { division: sc.division || '', scores: [] };
       }
       existingMap[pn].scores.push(newScore);
+    }
+
+    // Collect latest score per player for results calculation
+    if (!allScores[stage]) allScores[stage] = {};
+    for (var emKey in existingMap) {
+      var emEntry = existingMap[emKey];
+      if (emEntry.scores.length > 0) {
+        var latest = emEntry.scores[emEntry.scores.length - 1];
+        allScores[stage][emKey] = { time: latest.time, division: emEntry.division };
+      }
     }
 
     var compList = [];
@@ -359,7 +370,137 @@ function _syncScores(ss, data) {
     totalSynced += stageScores.length;
   }
 
+  // Build results tabs per division
+  _buildResultsTabs(eventSS, stageNames, allScores, competitors);
+
   return _jsonResponse({ success: true, count: totalSynced });
+}
+
+/* =============================================================
+   Build Results tabs — one per division with percentile scoring.
+   Percentile = (fastest_time_in_division / shooter_time) × 100
+   DNF = 0%.  Overall = sum of stage percentiles.
+   ============================================================= */
+function _buildResultsTabs(eventSS, stageNames, allScores, competitors) {
+  // Build shooter → division map
+  var shooterDiv = {};
+  for (var i = 0; i < competitors.length; i++) {
+    var cn = competitors[i].name || '';
+    if (cn) shooterDiv[cn] = competitors[i].division || 'Unclassified';
+  }
+  // Include shooters from scores that aren't in the competitors list
+  for (var si = 0; si < stageNames.length; si++) {
+    var stg = stageNames[si];
+    if (!allScores[stg]) continue;
+    for (var nm in allScores[stg]) {
+      if (!shooterDiv[nm]) shooterDiv[nm] = allScores[stg][nm].division || 'Unclassified';
+    }
+  }
+
+  // Group shooters by division
+  var divisionShooters = {};
+  for (var nm2 in shooterDiv) {
+    var dv = shooterDiv[nm2];
+    if (!divisionShooters[dv]) divisionShooters[dv] = [];
+    divisionShooters[dv].push(nm2);
+  }
+
+  // For each division, create/update a results tab
+  for (var div in divisionShooters) {
+    var shooters = divisionShooters[div];
+    var tabName = ('Results \u2014 ' + div).substring(0, 100);
+
+    // Fastest valid time per stage within this division
+    var fastestPerStage = {};
+    for (var s1 = 0; s1 < stageNames.length; s1++) {
+      var stgName = stageNames[s1];
+      var fastest = Infinity;
+      for (var p1 = 0; p1 < shooters.length; p1++) {
+        var sc = allScores[stgName] && allScores[stgName][shooters[p1]];
+        if (sc && sc.time !== 'DNF' && typeof sc.time === 'number' && sc.time > 0 && sc.time < fastest) {
+          fastest = sc.time;
+        }
+      }
+      fastestPerStage[stgName] = fastest === Infinity ? 0 : fastest;
+    }
+
+    // Calculate percentile per stage per shooter
+    var results = [];
+    for (var p2 = 0; p2 < shooters.length; p2++) {
+      var player = shooters[p2];
+      var stageResults = [];
+      var totalPct = 0;
+      for (var s2 = 0; s2 < stageNames.length; s2++) {
+        var pct = 0;
+        var entry = allScores[stageNames[s2]] && allScores[stageNames[s2]][player];
+        if (entry) {
+          var f = fastestPerStage[stageNames[s2]];
+          if (entry.time !== 'DNF' && typeof entry.time === 'number' && entry.time > 0 && f > 0) {
+            pct = (f / entry.time) * 100;
+          }
+        }
+        stageResults.push(pct);
+        totalPct += pct;
+      }
+      results.push({ name: player, stageResults: stageResults, stageRanks: [], total: totalPct });
+    }
+
+    // Per-stage ranks (within this division)
+    for (var s3 = 0; s3 < stageNames.length; s3++) {
+      var idx = s3;
+      var sorted = results.slice().sort(function(a, b) {
+        return b.stageResults[idx] - a.stageResults[idx];
+      });
+      for (var ri = 0; ri < sorted.length; ri++) {
+        sorted[ri].stageRanks[idx] = ri + 1;
+      }
+    }
+
+    // Sort by overall total descending
+    results.sort(function(a, b) { return b.total - a.total; });
+
+    // Build headers: Rank | Shooter | Stage1 % | Stage1 Rank | … | Overall %
+    var headers = ['Rank', 'Shooter'];
+    for (var s4 = 0; s4 < stageNames.length; s4++) {
+      headers.push(stageNames[s4] + ' %');
+      headers.push(stageNames[s4] + ' Rank');
+    }
+    headers.push('Overall %');
+    var totalCols = headers.length;
+
+    // Build rows
+    var rows = [];
+    for (var r = 0; r < results.length; r++) {
+      var res = results[r];
+      var row = [r + 1, res.name];
+      for (var s5 = 0; s5 < stageNames.length; s5++) {
+        row.push(Math.round(res.stageResults[s5] * 100) / 100);
+        row.push(res.stageRanks[s5]);
+      }
+      row.push(Math.round(res.total * 100) / 100);
+      rows.push(row);
+    }
+
+    // Write to sheet
+    var sheet = eventSS.getSheetByName(tabName);
+    if (!sheet) sheet = eventSS.insertSheet(tabName);
+    sheet.clear();
+
+    sheet.getRange(1, 1, 1, totalCols).setValues([headers]);
+    sheet.getRange(1, 1, 1, totalCols)
+      .setFontWeight('bold')
+      .setBackground('#1565c0')
+      .setFontColor('#ffffff');
+    sheet.setFrozenRows(1);
+
+    if (rows.length) {
+      sheet.getRange(2, 1, rows.length, totalCols).setValues(rows);
+    }
+
+    for (var col = 1; col <= totalCols; col++) {
+      sheet.autoResizeColumn(col);
+    }
+  }
 }
 
 /* =============================================================
