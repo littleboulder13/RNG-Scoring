@@ -209,7 +209,7 @@ function _syncScores(ss, data) {
   }
 
   var BASE_HEADERS = ['#', 'Shooter', 'Division'];
-  var SCORE_HEADERS = ['Wait Time (m:ss)', 'Wait Time (s)', 'Time (s)', 'Targets Not Neutralized', 'Notes'];
+  var SCORE_HEADERS = ['Time (s)', 'Targets Not Neutralized', 'Wait Time (m:ss)', 'Wait Time (s)', 'Notes'];
   var SCORE_COLS = SCORE_HEADERS.length;
 
   function fmtWait(totalSec) {
@@ -262,15 +262,13 @@ function _syncScores(ss, data) {
         for (var b = 0; b < 50; b++) {
           var off = BASE_HEADERS.length + b * SCORE_COLS;
           if (off >= numCols) break;
-          var waitVal = existData[ex][off];
-          var timeVal = existData[ex][off + 2];
-          if ((waitVal === '' || waitVal === undefined || waitVal === null) &&
-              (timeVal === '' || timeVal === undefined || timeVal === null)) break;
+          var timeVal = existData[ex][off];
+          if (timeVal === '' || timeVal === undefined || timeVal === null) break;
           exScores.push({
-            waitTime: waitVal || '',
-            waitTimeSec: existData[ex][off + 1] || 0,
             time: timeVal,
-            tnt: existData[ex][off + 3] || 0,
+            tnt: existData[ex][off + 1] || 0,
+            waitTime: existData[ex][off + 2] || '',
+            waitTimeSec: existData[ex][off + 3] || 0,
             notes: existData[ex][off + 4] || ''
           });
         }
@@ -284,10 +282,10 @@ function _syncScores(ss, data) {
       if (!pn) continue;
       var waitSec = sc.waitTime || 0;
       var newScore = {
-        waitTime: fmtWait(waitSec),
-        waitTimeSec: waitSec,
         time: sc.dnf ? 'DNF' : (sc.time || 0),
         tnt: sc.targetsNotNeutralized || 0,
+        waitTime: fmtWait(waitSec),
+        waitTimeSec: waitSec,
         notes: sc.notes || ''
       };
       if (!existingMap[pn]) {
@@ -334,7 +332,7 @@ function _syncScores(ss, data) {
       var row = [ri + 1, comp.name, comp.division];
       for (var sb = 0; sb < maxBlocks; sb++) {
         if (entry && sb < entry.scores.length) {
-          row.push(entry.scores[sb].waitTime, entry.scores[sb].waitTimeSec, entry.scores[sb].time, entry.scores[sb].tnt, entry.scores[sb].notes);
+          row.push(entry.scores[sb].time, entry.scores[sb].tnt, entry.scores[sb].waitTime, entry.scores[sb].waitTimeSec, entry.scores[sb].notes);
         } else {
           row.push('', '', '', '', '');
         }
