@@ -1,6 +1,6 @@
 /**
  * =============================================================
- * Stilly Run 'N Gun — Google Apps Script (v105)
+ * Stilly Run 'N Gun — Google Apps Script (v107)
  *
  * Each event gets its own Google Spreadsheet in a Drive folder.
  * The master spreadsheet stores event metadata (Events tab) and
@@ -25,6 +25,29 @@
  *   3. Deploy → Web app → Execute as Me → Anyone → Deploy
  * =============================================================
  */
+
+/* =============================================================
+   Run this function manually from the editor to authorize
+   DriveApp and SpreadsheetApp scopes. Select "testAuth" from
+   the function dropdown and click ▶ Run.
+   ============================================================= */
+function testAuth() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  Logger.log('Spreadsheet: ' + ss.getName());
+  var folder = _getEventsFolder(ss);
+  Logger.log('Events folder: ' + folder.getName());
+  // Create and immediately trash a test file to authorize all Drive operations
+  var testSS = SpreadsheetApp.create('_auth_test_delete_me');
+  var file = DriveApp.getFileById(testSS.getId());
+  folder.addFile(file);
+  var parents = file.getParents();
+  while (parents.hasNext()) {
+    var p = parents.next();
+    if (p.getId() !== folder.getId()) p.removeFile(file);
+  }
+  file.setTrashed(true);
+  Logger.log('Authorization complete — DriveApp and SpreadsheetApp are both authorized.');
+}
 
 function doPost(e) {
   try {
@@ -94,7 +117,12 @@ function _getEventSpreadsheet(ss, eventId, eventName) {
   var folder = _getEventsFolder(ss);
 
   // Move into the events folder
-  file.moveTo(folder);
+  folder.addFile(file);
+  var parents = file.getParents();
+  while (parents.hasNext()) {
+    var p = parents.next();
+    if (p.getId() !== folder.getId()) p.removeFile(file);
+  }
 
   // Delete the default "Sheet1" tab
   var defaultSheet = newSS.getSheetByName('Sheet1');
