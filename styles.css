@@ -189,6 +189,36 @@ input:focus, textarea:focus, select:focus {
     color: #888;
 }
 
+.hms-input-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.hms-input-row .hms-input {
+    flex: 1;
+}
+
+.btn-now {
+    padding: 0.5rem 0.85rem;
+    background: var(--secondary-color);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.btn-now:hover {
+    opacity: 0.9;
+}
+
+.btn-now:active {
+    opacity: 0.8;
+}
+
 .checkbox-group {
     margin-bottom: 0.75rem;
 }

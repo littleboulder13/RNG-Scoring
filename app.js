@@ -555,6 +555,15 @@ document.addEventListener('DOMContentLoaded', () => {
     initHmsInput($('run-start-time'));
     initHmsInput($('run-finish-time'));
 
+    // --- Finish Time "Now" button ---
+    $('finish-now-btn').addEventListener('click', () => {
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        const ss = String(now.getSeconds()).padStart(2, '0');
+        $('run-finish-time').value = `${hh}:${mm}:${ss}`;
+    });
+
     // --- Save Start Time button (Run Time stages) ---
     $('save-start-btn').addEventListener('click', () => {
         const stageName  = $('stage').value;
