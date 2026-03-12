@@ -412,11 +412,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (ev.stages.find(s => s.name === name)) { alert(`Stage "${name}" already exists.`); return; }
         ev.stages.push({
             name,
+            type:    $('edit-stage-type').value || 'standard_rng',
             targets: $('edit-stage-targets').value.trim(),
             par:     $('edit-stage-par').value.trim()
         });
         updateEvent(editingEventId, { stages: ev.stages });
         $('edit-stage-name').value = '';
+        $('edit-stage-type').value = 'standard_rng';
         $('edit-stage-targets').value = '';
         $('edit-stage-par').value = '';
         renderEditStagesList();

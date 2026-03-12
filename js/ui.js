@@ -318,8 +318,11 @@ function renderEditStagesList() {
         return;
     }
 
+    var STAGE_TYPE_LABELS = { 'standard_rng': 'Standard RNG Stage' };
     el.innerHTML = ev.stages.map(s => {
+        const typeLabel = STAGE_TYPE_LABELS[s.type || 'standard_rng'] || s.type || 'Standard RNG Stage';
         const meta = [
+            typeLabel,
             s.targets ? `${s.targets} targets` : '',
             s.par     ? `PAR: ${s.par}s`        : ''
         ].filter(Boolean).join(' · ');
@@ -336,6 +339,9 @@ function renderEditStagesList() {
             </div>
             <div class="stage-edit" style="display:none">
                 <input type="text" class="edit-name" value="${s.name}" placeholder="Stage name">
+                <select class="edit-type" style="width:180px">
+                    <option value="standard_rng"${(s.type || 'standard_rng') === 'standard_rng' ? ' selected' : ''}>Standard RNG Stage</option>
+                </select>
                 <input type="number" class="edit-targets" value="${s.targets}" placeholder="# targets" min="0" style="width:100px">
                 <input type="number" class="edit-par" value="${s.par}" placeholder="PAR (s)" min="0" step="0.01" style="width:100px">
                 <div class="edit-actions">
@@ -393,6 +399,7 @@ function renderEditStagesList() {
             if (idx === -1) return;
             evNow.stages[idx] = {
                 name: newName,
+                type:    row.querySelector('.edit-type').value || 'standard_rng',
                 targets: row.querySelector('.edit-targets').value.trim(),
                 par:     row.querySelector('.edit-par').value.trim()
             };
