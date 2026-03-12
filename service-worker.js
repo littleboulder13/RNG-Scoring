@@ -1,3 +1,4 @@
+/* v114 */
 const CACHE_NAME = 'rng-scoring-v114';
 const urlsToCache = [
     './',
