@@ -554,6 +554,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Initialize HH:MM:SS auto-format inputs ---
     initHmsInput($('run-start-time'));
     initHmsInput($('run-finish-time'));
+    initMsInput($('wait-time'));
 
     // --- Start Time "Now" button ---
     $('start-now-btn').addEventListener('click', () => {
@@ -687,7 +688,7 @@ document.addEventListener('DOMContentLoaded', () => {
         pendingScore = score;
         const waitMin = Math.floor((score.waitTime || 0) / 60);
         const waitSec = (score.waitTime || 0) % 60;
-        const waitStr = waitMin + ':' + String(waitSec).padStart(2, '0');
+        const waitStr = String(waitMin).padStart(2, '0') + ':' + String(waitSec).padStart(2, '0');
 
         let rows;
         if (score.stageType === 'run_time') {
@@ -859,11 +860,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Wait time warning (> 30 minutes)
-        const waitMinutes = (parseInt($('wait-time-min').value) || 0);
-        const waitSeconds = (parseInt($('wait-time-sec').value) || 0);
-        const totalWaitMin = waitMinutes + waitSeconds / 60;
+        const waitTotalSec = parseMsToSeconds($('wait-time').value);
+        if (isNaN(waitTotalSec)) {
+            const err = $('form-error');
+            err.textContent = 'Enter a valid wait time (MM:SS).';
+            err.style.display = 'block';
+            return;
+        }
+        const totalWaitMin = waitTotalSec / 60;
         if (totalWaitMin > 30) {
-            if (!confirm(`Wait time is over 30 minutes (${waitMinutes}m ${waitSeconds}s).\n\nAre you sure this is correct?`)) return;
+            const wm = Math.floor(waitTotalSec / 60);
+            const ws = waitTotalSec % 60;
+            if (!confirm(`Wait time is over 30 minutes (${wm}m ${ws}s).\n\nAre you sure this is correct?`)) return;
         }
 
         $('form-error').style.display = 'none';
@@ -888,8 +896,7 @@ document.addEventListener('DOMContentLoaded', () => {
             playerName,
             division:              getPlayerDivision($('player-name').value),
             time:                  parseFloat($('time').value),
-            waitTime:              (parseInt($('wait-time-min').value) || 0) * 60
-                                 + (parseInt($('wait-time-sec').value) || 0),
+            waitTime:              parseMsToSeconds($('wait-time').value) || 0,
             targetsNotNeutralized: tnt,
             dnf:                   $('dnf').checked,
             notes:                 $('notes').value

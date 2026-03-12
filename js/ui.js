@@ -36,6 +36,42 @@ function initHmsInput(inputEl) {
 }
 
 /**
+ * Initialise a MM:SS auto-format input (right-fill, max 4 digits).
+ */
+function initMsInput(inputEl) {
+    if (!inputEl) return;
+
+    inputEl.addEventListener('input', () => {
+        const raw = inputEl.value.replace(/\D/g, '').slice(0, 4);
+        const padded = raw.padStart(4, '0');
+        const mm = padded.slice(0, 2);
+        const ss = padded.slice(2, 4);
+        inputEl.value = raw.length ? `${mm}:${ss}` : '';
+    });
+
+    inputEl.addEventListener('keydown', (e) => {
+        if ([8, 9, 13, 27, 46, 37, 38, 39, 40, 35, 36].includes(e.keyCode)) return;
+        if ((e.ctrlKey || e.metaKey) && [65, 67, 86, 88].includes(e.keyCode)) return;
+        if (e.key < '0' || e.key > '9') e.preventDefault();
+    });
+}
+
+/**
+ * Parse a MM:SS string into total seconds.
+ * Returns NaN if invalid.
+ */
+function parseMsToSeconds(ms) {
+    if (!ms || typeof ms !== 'string') return 0;
+    const clean = ms.replace(/\D/g, '');
+    if (!clean) return 0;
+    const padded = clean.padStart(4, '0');
+    const m = parseInt(padded.slice(0, 2)) || 0;
+    const s = parseInt(padded.slice(2, 4)) || 0;
+    if (s > 59) return NaN;
+    return m * 60 + s;
+}
+
+/**
  * Parse an HH:MM:SS string into total seconds.
  * Returns NaN if invalid.
  */
@@ -182,11 +218,10 @@ function toggleStageTypeFields() {
     if ($('time'))       $('time').required = isStandard && !dnf;
 
     // Wait time — hidden for Run Time
-    const waitTimeRow = document.querySelector('.form-group:has(#wait-time-min)');
+    const waitTimeRow = document.querySelector('.form-group:has(#wait-time)');
     if (waitTimeRow) waitTimeRow.style.display = isRunTime ? 'none' : '';
     if (isRunTime) {
-        if ($('wait-time-min')) $('wait-time-min').value = '';
-        if ($('wait-time-sec')) $('wait-time-sec').value = '';
+        if ($('wait-time')) $('wait-time').value = '';
     }
 
     // Run Time fields

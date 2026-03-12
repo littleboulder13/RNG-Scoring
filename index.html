@@ -26,7 +26,7 @@
                 <img src="logo.png" alt="Stilly Run 'N Gun" class="event-logo">
                 <h1>Stilly Run 'N Gun</h1>
                 <p>Select an event to continue</p>
-                <span id="app-version" style="font-size:0.75rem;color:#ff0;background:#333;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px;">v119</span>
+                <span id="app-version" style="font-size:0.75rem;color:#ff0;background:#333;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px;">v120</span>
                 <div style="margin-top:10px;display:flex;gap:8px;justify-content:center;">
                     <button id="pull-events-btn" onclick="pullEvents()" style="font-size:0.85rem;padding:6px 14px;border:none;border-radius:6px;background:#1565c0;color:#fff;cursor:pointer;">⬇ Pull from Cloud</button>
                 </div>
@@ -113,7 +113,7 @@
                 <div class="header-brand">
                     <img src="logo.png" alt="" class="header-logo">
                     <h1>Stilly RNG</h1>
-                    <span id="app-version-header" class="app-version-badge">v119</span>
+                    <span id="app-version-header" class="app-version-badge">v120</span>
                 </div>
                 <div id="active-event-bar" class="active-event-bar" style="display:none">
                     📋 <span id="active-event-name"></span>
@@ -203,11 +203,8 @@
                             </div>
                         </div>
                         <div class="form-group">
-                            <label>Wait Time</label>
-                            <div class="time-inputs">
-                                <input type="number" id="wait-time-min" min="0" placeholder="0" class="time-part"> <span class="time-sep">m</span>
-                                <input type="number" id="wait-time-sec" min="0" max="59" placeholder="00" class="time-part"> <span class="time-sep">s</span>
-                            </div>
+                            <label>Wait Time <span class="time-format-hint">(MM:SS)</span></label>
+                            <input type="text" id="wait-time" class="hms-input" inputmode="numeric" placeholder="MM:SS" maxlength="5" autocomplete="off">
                         </div>
                         <div class="form-group">
                             <label for="notes">Notes (optional)</label>
