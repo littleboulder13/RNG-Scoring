@@ -173,6 +173,22 @@ input:focus, textarea:focus, select:focus {
     flex-shrink: 0;
 }
 
+/* HH:MM:SS single input */
+.hms-input {
+    width: 100%;
+    font-size: 1.3rem;
+    font-family: 'Courier New', Courier, monospace;
+    letter-spacing: 0.15em;
+    text-align: center;
+    padding: 0.5rem;
+}
+
+.time-format-hint {
+    font-weight: 400;
+    font-size: 0.8rem;
+    color: #888;
+}
+
 .checkbox-group {
     margin-bottom: 0.75rem;
 }

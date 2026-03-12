@@ -204,14 +204,11 @@ function checkAndFillPendingStart() {
     const pending = getPendingStart(eventId, stageName, playerName);
     if (!pending) return;
 
-    // Auto-fill start time fields
-    $('run-start-min').value = pending.startMin || '';
-    $('run-start-sec').value = pending.startSec || '';
+    // Auto-fill start time field
+    $('run-start-time').value = pending.startHms || '';
     // Show info banner
-    const fmtMin = pending.startMin || 0;
-    const fmtSec = String(Math.floor(pending.startSec || 0)).padStart(2, '0');
     if (info) {
-        info.textContent = `⏱ Start time loaded (${fmtMin}:${fmtSec}) — enter finish time to complete`;
+        info.textContent = `⏱ Start time loaded (${pending.startHms}) — enter finish time to complete`;
         info.style.display = 'block';
     }
 }
@@ -242,11 +239,9 @@ function updateActiveRunners() {
     row.style.display = '';
     count.textContent = runners.length;
     list.innerHTML = runners.map(r => {
-        const m = r.startMin || 0;
-        const s = String(Math.floor(r.startSec || 0)).padStart(2, '0');
         return `<div class="active-runner-item" data-player="${r.playerName}">
             <span class="runner-name">${r.playerName}</span>
-            <span class="runner-start">${m}:${s}</span>
+            <span class="runner-start">${r.startHms || ''}</span>
             <button type="button" class="runner-select-btn" title="Select this shooter">↩</button>
             <button type="button" class="runner-clear-btn" title="Remove saved start">✕</button>
         </div>`;
@@ -269,8 +264,7 @@ function updateActiveRunners() {
                 updateActiveRunners();
                 // If this shooter is currently selected, clear the start fields
                 if ($('player-name').value === name) {
-                    $('run-start-min').value = '';
-                    $('run-start-sec').value = '';
+                    $('run-start-time').value = '';
                     $('saved-start-info').style.display = 'none';
                 }
             }
@@ -557,6 +551,10 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleDNFFields();
     toggleStageTypeFields();
 
+    // --- Initialize HH:MM:SS auto-format inputs ---
+    initHmsInput($('run-start-time'));
+    initHmsInput($('run-finish-time'));
+
     // --- Save Start Time button (Run Time stages) ---
     $('save-start-btn').addEventListener('click', () => {
         const stageName  = $('stage').value;
@@ -568,16 +566,16 @@ document.addEventListener('DOMContentLoaded', () => {
             err.style.display = 'block';
             return;
         }
-        const startMin = parseInt($('run-start-min').value) || 0;
-        const startSec = parseFloat($('run-start-sec').value) || 0;
-        if (startMin === 0 && startSec === 0) {
+        const startHms = $('run-start-time').value.trim();
+        const startSec = parseHmsToSeconds(startHms);
+        if (isNaN(startSec) || startSec === 0) {
             const err = $('form-error');
-            err.textContent = 'Enter a start time before saving.';
+            err.textContent = 'Enter a valid start time (HH:MM:SS) before saving.';
             err.style.display = 'block';
             return;
         }
         $('form-error').style.display = 'none';
-        savePendingStart(eventId, stageName, playerName, startMin, startSec);
+        savePendingStart(eventId, stageName, playerName, startHms);
         // Show brief confirmation
         const info = $('saved-start-info');
         info.textContent = `⏱ Start time saved for ${playerName}`;
@@ -585,10 +583,8 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => { info.style.display = 'none'; }, 3000);
         // Reset shooter dropdown to allow entering another
         $('player-name').value = '';
-        $('run-start-min').value = '';
-        $('run-start-sec').value = '';
-        $('run-finish-min').value = '';
-        $('run-finish-sec').value = '';
+        $('run-start-time').value = '';
+        $('run-finish-time').value = '';
         showShooterDivision();
         updateActiveRunners();
     });
@@ -756,13 +752,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- Run Time stage validation ---
         if (stageType === 'run_time') {
-            const startMin = parseInt($('run-start-min').value)  || 0;
-            const startSec = parseFloat($('run-start-sec').value) || 0;
-            const finMin   = parseInt($('run-finish-min').value)  || 0;
-            const finSec   = parseFloat($('run-finish-sec').value) || 0;
-            const startTotal = startMin * 60 + startSec;
-            const finTotal   = finMin * 60 + finSec;
+            const startHms  = $('run-start-time').value.trim();
+            const finishHms = $('run-finish-time').value.trim();
+            const startTotal = parseHmsToSeconds(startHms);
+            const finTotal   = parseHmsToSeconds(finishHms);
 
+            if (isNaN(startTotal)) {
+                const err = $('form-error');
+                err.textContent = 'Enter a valid start time (HH:MM:SS).';
+                err.style.display = 'block';
+                return;
+            }
+            if (isNaN(finTotal)) {
+                const err = $('form-error');
+                err.textContent = 'Enter a valid finish time (HH:MM:SS).';
+                err.style.display = 'block';
+                return;
+            }
             if (finTotal <= startTotal) {
                 const err = $('form-error');
                 err.textContent = 'Finish time must be after start time.';
@@ -785,9 +791,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!confirmed) return;
             }
 
-            const fmtStart = startMin + ':' + String(Math.floor(startSec)).padStart(2, '0');
-            const fmtFinish = finMin + ':' + String(Math.floor(finSec)).padStart(2, '0');
-
             const score = {
                 eventId:               getActiveEventId(),
                 stage:                 stageName,
@@ -797,8 +800,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 time:                  runTime,
                 startTime:             startTotal,
                 finishTime:            finTotal,
-                startTimeFormatted:    fmtStart,
-                finishTimeFormatted:   fmtFinish,
+                startTimeFormatted:    startHms,
+                finishTimeFormatted:   finishHms,
                 waitTime:              0,
                 targetsNotNeutralized: 0,
                 dnf:                   false,

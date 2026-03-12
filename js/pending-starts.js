@@ -6,7 +6,7 @@
    enter the finish time.
    
    Storage key: rng_pending_starts
-   Value: { "eventId|stageName|playerName": { startMin, startSec, savedAt } }
+   Value: { "eventId|stageName|playerName": { startHms, savedAt } }
    ============================================================= */
 
 const PENDING_STARTS_KEY = 'rng_pending_starts';
@@ -26,13 +26,12 @@ function _savePendingStartsRaw(data) {
 }
 
 /**
- * Save a shooter's start time for later finish-time entry.
+ * Save a shooter's start time (HH:MM:SS string) for later finish-time entry.
  */
-function savePendingStart(eventId, stageName, playerName, startMin, startSec) {
+function savePendingStart(eventId, stageName, playerName, startHms) {
     const data = getAllPendingStartsRaw();
     data[_pendingStartKey(eventId, stageName, playerName)] = {
-        startMin,
-        startSec,
+        startHms,
         savedAt: Date.now()
     };
     _savePendingStartsRaw(data);
@@ -40,7 +39,7 @@ function savePendingStart(eventId, stageName, playerName, startMin, startSec) {
 
 /**
  * Retrieve a saved start time for a specific shooter/stage.
- * Returns { startMin, startSec, savedAt } or null.
+ * Returns { startHms, savedAt } or null.
  */
 function getPendingStart(eventId, stageName, playerName) {
     const data = getAllPendingStartsRaw();
@@ -58,7 +57,7 @@ function clearPendingStart(eventId, stageName, playerName) {
 
 /**
  * Get all pending starts for a given event + stage.
- * Returns array of { playerName, startMin, startSec, savedAt }.
+ * Returns array of { playerName, startHms, savedAt }.
  */
 function getPendingStartsForStage(eventId, stageName) {
     const data = getAllPendingStartsRaw();

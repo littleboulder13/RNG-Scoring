@@ -1,6 +1,6 @@
 /**
  * =============================================================
- * Stilly Run 'N Gun — Google Apps Script (v115)
+ * Stilly Run 'N Gun — Google Apps Script (v116)
  *
  * Each event gets its own Google Spreadsheet in a Drive folder.
  * The master spreadsheet stores event metadata (Events tab) and
@@ -212,7 +212,7 @@ function _syncScores(ss, data) {
   var BASE_HEADERS = ['#', 'Shooter', 'Division'];
   var STD_SCORE_HEADERS = ['Time (s)', 'Targets Not Neutralized', 'Wait Time (m:ss)', 'Wait Time (s)', 'Notes'];
   var STD_SCORE_COLS = STD_SCORE_HEADERS.length;
-  var RT_SCORE_HEADERS = ['Start Time (m:ss)', 'Start Time (s)', 'Finish Time (m:ss)', 'Finish Time (s)', 'Run Time (s)', 'Notes'];
+  var RT_SCORE_HEADERS = ['Start Time (H:MM:SS)', 'Start Time (s)', 'Finish Time (H:MM:SS)', 'Finish Time (s)', 'Run Time (s)', 'Notes'];
   var RT_SCORE_COLS = RT_SCORE_HEADERS.length;
 
   // Build stage name → type lookup
@@ -227,6 +227,14 @@ function _syncScores(ss, data) {
     var m = Math.floor((totalSec || 0) / 60);
     var s = (totalSec || 0) % 60;
     return m + ':' + ('0' + s).slice(-2);
+  }
+
+  function fmtHms(totalSec) {
+    var sec = Math.round(totalSec || 0);
+    var h = Math.floor(sec / 3600);
+    var m = Math.floor((sec % 3600) / 60);
+    var s = sec % 60;
+    return ('0' + h).slice(-2) + ':' + ('0' + m).slice(-2) + ':' + ('0' + s).slice(-2);
   }
 
   var scoresByStage = {};
@@ -310,9 +318,9 @@ function _syncScores(ss, data) {
       var newScore;
       if (isRunTime) {
         newScore = {
-          startTimeFmt: sc.startTimeFormatted || fmtWait(sc.startTime || 0),
+          startTimeFmt: sc.startTimeFormatted || fmtHms(sc.startTime || 0),
           startTimeSec: sc.startTime || 0,
-          finishTimeFmt: sc.finishTimeFormatted || fmtWait(sc.finishTime || 0),
+          finishTimeFmt: sc.finishTimeFormatted || fmtHms(sc.finishTime || 0),
           finishTimeSec: sc.finishTime || 0,
           runTime: sc.time || 0,
           notes: sc.notes || ''

@@ -2,6 +2,77 @@
    UI — Render Lists, Dropdowns, Display Helpers
    ============================================================= */
 
+/* =============================================================
+   HH:MM:SS Auto-Format Input Helper
+   As the user types digits, colons are inserted automatically.
+   Accepts only digits; colons are managed by the formatter.
+   ============================================================= */
+
+/**
+ * Attach auto-format behavior to an HH:MM:SS input element.
+ * Call once per input during init.
+ */
+function initHmsInput(inputEl) {
+    if (!inputEl) return;
+
+    inputEl.addEventListener('input', () => {
+        const raw = inputEl.value.replace(/\D/g, '');   // digits only
+        let formatted = '';
+        for (let i = 0; i < raw.length && i < 6; i++) {
+            if (i === 2 || i === 4) formatted += ':';
+            formatted += raw[i];
+        }
+        inputEl.value = formatted;
+    });
+
+    // Prevent non-digit keys (allow navigation, backspace, tab, etc.)
+    inputEl.addEventListener('keydown', (e) => {
+        // Allow: backspace, delete, tab, escape, enter, arrows, home, end
+        if ([8, 9, 13, 27, 46, 37, 38, 39, 40, 35, 36].includes(e.keyCode)) return;
+        // Allow Ctrl/Cmd + A, C, V, X
+        if ((e.ctrlKey || e.metaKey) && [65, 67, 86, 88].includes(e.keyCode)) return;
+        // Block anything that isn't a digit
+        if (e.key < '0' || e.key > '9') e.preventDefault();
+    });
+}
+
+/**
+ * Parse an HH:MM:SS string into total seconds.
+ * Returns NaN if invalid.
+ */
+function parseHmsToSeconds(hms) {
+    if (!hms || typeof hms !== 'string') return NaN;
+    const parts = hms.split(':');
+    if (parts.length === 3) {
+        const h = parseInt(parts[0]) || 0;
+        const m = parseInt(parts[1]) || 0;
+        const s = parseInt(parts[2]) || 0;
+        if (m > 59 || s > 59) return NaN;
+        return h * 3600 + m * 60 + s;
+    }
+    if (parts.length === 2) {
+        const m = parseInt(parts[0]) || 0;
+        const s = parseInt(parts[1]) || 0;
+        if (s > 59) return NaN;
+        return m * 60 + s;
+    }
+    return NaN;
+}
+
+/**
+ * Format total seconds into HH:MM:SS string.
+ */
+function formatSecondsToHms(totalSec) {
+    if (totalSec == null || isNaN(totalSec)) return '';
+    const sec = Math.round(totalSec);
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return String(h).padStart(2, '0') + ':' +
+           String(m).padStart(2, '0') + ':' +
+           String(s).padStart(2, '0');
+}
+
 // --- Player Dropdown ---
 function populatePlayerDropdown() {
     const sel = $('player-name');
@@ -136,10 +207,8 @@ function toggleStageTypeFields() {
         if ($('targets-not-neutralized')) $('targets-not-neutralized').value = '0';
         if ($('dnf')) $('dnf').checked = false;
     } else {
-        if ($('run-start-min')) $('run-start-min').value = '';
-        if ($('run-start-sec')) $('run-start-sec').value = '';
-        if ($('run-finish-min')) $('run-finish-min').value = '';
-        if ($('run-finish-sec')) $('run-finish-sec').value = '';
+        if ($('run-start-time'))  $('run-start-time').value  = '';
+        if ($('run-finish-time')) $('run-finish-time').value = '';
     }
 }
 
