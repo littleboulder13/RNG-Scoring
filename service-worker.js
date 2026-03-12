@@ -1,5 +1,5 @@
-/* v114 */
-const CACHE_NAME = 'rng-scoring-v114';
+/* v115 */
+const CACHE_NAME = 'rng-scoring-v115';
 const urlsToCache = [
     './',
     './index.html',
@@ -9,6 +9,7 @@ const urlsToCache = [
     './js/events.js',
     './js/players.js',
     './js/stages.js',
+    './js/pending-starts.js',
     './js/ui.js',
     './js/excel.js',
     './js/sync.js',

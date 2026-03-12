@@ -1172,3 +1172,121 @@ body:not(.admin-mode) .admin-only {
     border: none;
     padding: 0.25rem;
 }
+
+/* =============================================================
+   Save Start / Active Runners (Run Time stages)
+   ============================================================= */
+
+.btn-save-start {
+    width: 100%;
+    padding: 0.6rem 1rem;
+    background: #FF9800;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 0.25rem;
+}
+
+.btn-save-start:hover {
+    background: #F57C00;
+}
+
+.btn-save-start:active {
+    background: #E65100;
+}
+
+.saved-start-info {
+    background: #E3F2FD;
+    color: #1565C0;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    border-left: 3px solid #1565C0;
+}
+
+.active-runners {
+    background: #FFF3E0;
+    border: 1px solid #FFB74D;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    overflow: hidden;
+}
+
+.active-runners-header {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #E65100;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    user-select: none;
+}
+
+.active-runners-chevron {
+    margin-left: auto;
+    font-size: 0.8rem;
+}
+
+.active-runners-list {
+    padding: 0 0.75rem 0.5rem;
+}
+
+.active-runner-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0;
+    border-top: 1px solid #FFE0B2;
+    font-size: 0.85rem;
+}
+
+.active-runner-item:first-child {
+    border-top: 1px solid #FFE0B2;
+}
+
+.runner-name {
+    flex: 1;
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.runner-start {
+    color: #666;
+    font-family: monospace;
+    font-size: 0.85rem;
+}
+
+.runner-select-btn,
+.runner-clear-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.15rem 0.35rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    line-height: 1;
+}
+
+.runner-select-btn {
+    color: #1565C0;
+}
+
+.runner-select-btn:hover {
+    background: #E3F2FD;
+}
+
+.runner-clear-btn {
+    color: #C62828;
+    font-size: 0.75rem;
+}
+
+.runner-clear-btn:hover {
+    background: #FFEBEE;
+}

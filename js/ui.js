@@ -123,6 +123,13 @@ function toggleStageTypeFields() {
     if ($('run-time-start-row'))  $('run-time-start-row').style.display  = isRunTime ? '' : 'none';
     if ($('run-time-finish-row')) $('run-time-finish-row').style.display = isRunTime ? '' : 'none';
 
+    // Save Start button & active runners — only for Run Time
+    if ($('run-time-save-start-row')) $('run-time-save-start-row').style.display = isRunTime ? '' : 'none';
+    if (!isRunTime) {
+        if ($('active-runners-row'))  $('active-runners-row').style.display  = 'none';
+        if ($('saved-start-info'))    $('saved-start-info').style.display    = 'none';
+    }
+
     // Clear hidden fields when switching
     if (isRunTime) {
         if ($('time')) $('time').value = '';

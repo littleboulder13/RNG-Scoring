@@ -185,6 +185,100 @@ function updateAdminUI() {
 }
 
 /* =============================================================
+   Pending Start Helpers — check/fill/update active runners
+   ============================================================= */
+
+/** Auto-fill start time if a pending start exists for the selected shooter + stage. */
+function checkAndFillPendingStart() {
+    const info = $('saved-start-info');
+    if (info) info.style.display = 'none';
+
+    const stageName  = $('stage')?.value;
+    const playerName = $('player-name')?.value;
+    const eventId    = getActiveEventId();
+    if (!stageName || !playerName || !eventId) return;
+
+    const stage = getStages().find(s => s.name === stageName);
+    if (!stage || (stage.type || 'standard_rng') !== 'run_time') return;
+
+    const pending = getPendingStart(eventId, stageName, playerName);
+    if (!pending) return;
+
+    // Auto-fill start time fields
+    $('run-start-min').value = pending.startMin || '';
+    $('run-start-sec').value = pending.startSec || '';
+    // Show info banner
+    const fmtMin = pending.startMin || 0;
+    const fmtSec = String(Math.floor(pending.startSec || 0)).padStart(2, '0');
+    if (info) {
+        info.textContent = `⏱ Start time loaded (${fmtMin}:${fmtSec}) — enter finish time to complete`;
+        info.style.display = 'block';
+    }
+}
+
+/** Update the active-runners indicator for the current Run Time stage. */
+function updateActiveRunners() {
+    const row   = $('active-runners-row');
+    const count = $('active-runner-count');
+    const list  = $('active-runners-list');
+    if (!row) return;
+
+    const stageName = $('stage')?.value;
+    const eventId   = getActiveEventId();
+    const stage     = getStages().find(s => s.name === stageName);
+    const isRunTime = stage && (stage.type || 'standard_rng') === 'run_time';
+
+    if (!isRunTime || !stageName || !eventId) {
+        row.style.display = 'none';
+        return;
+    }
+
+    const runners = getPendingStartsForStage(eventId, stageName);
+    if (runners.length === 0) {
+        row.style.display = 'none';
+        return;
+    }
+
+    row.style.display = '';
+    count.textContent = runners.length;
+    list.innerHTML = runners.map(r => {
+        const m = r.startMin || 0;
+        const s = String(Math.floor(r.startSec || 0)).padStart(2, '0');
+        return `<div class="active-runner-item" data-player="${r.playerName}">
+            <span class="runner-name">${r.playerName}</span>
+            <span class="runner-start">${m}:${s}</span>
+            <button type="button" class="runner-select-btn" title="Select this shooter">↩</button>
+            <button type="button" class="runner-clear-btn" title="Remove saved start">✕</button>
+        </div>`;
+    }).join('');
+
+    // Attach click handlers for select / clear buttons
+    list.querySelectorAll('.runner-select-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const name = btn.closest('.active-runner-item').dataset.player;
+            $('player-name').value = name;
+            showShooterDivision();
+            checkAndFillPendingStart();
+        });
+    });
+    list.querySelectorAll('.runner-clear-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const name = btn.closest('.active-runner-item').dataset.player;
+            if (confirm(`Remove saved start time for ${name}?`)) {
+                clearPendingStart(eventId, stageName, name);
+                updateActiveRunners();
+                // If this shooter is currently selected, clear the start fields
+                if ($('player-name').value === name) {
+                    $('run-start-min').value = '';
+                    $('run-start-sec').value = '';
+                    $('saved-start-info').style.display = 'none';
+                }
+            }
+        });
+    });
+}
+
+/* =============================================================
    UI Event Listeners — registered on page load, independent of DB
    ============================================================= */
 document.addEventListener('DOMContentLoaded', () => {
@@ -449,14 +543,68 @@ document.addEventListener('DOMContentLoaded', () => {
         showStageInfo();
         toggleStageTypeFields();
         updateScoredShooterStyles();
+        updateActiveRunners();
+        checkAndFillPendingStart();
     });
-    $('player-name').addEventListener('change', showShooterDivision);
+    $('player-name').addEventListener('change', () => {
+        showShooterDivision();
+        checkAndFillPendingStart();
+    });
     $('dnf').addEventListener('change', () => {
         toggleDNFFields();
         toggleStageTypeFields();
     });
     toggleDNFFields();
     toggleStageTypeFields();
+
+    // --- Save Start Time button (Run Time stages) ---
+    $('save-start-btn').addEventListener('click', () => {
+        const stageName  = $('stage').value;
+        const playerName = $('player-name').value;
+        const eventId    = getActiveEventId();
+        if (!stageName || !playerName || !eventId) {
+            const err = $('form-error');
+            err.textContent = 'Select a stage and shooter first.';
+            err.style.display = 'block';
+            return;
+        }
+        const startMin = parseInt($('run-start-min').value) || 0;
+        const startSec = parseFloat($('run-start-sec').value) || 0;
+        if (startMin === 0 && startSec === 0) {
+            const err = $('form-error');
+            err.textContent = 'Enter a start time before saving.';
+            err.style.display = 'block';
+            return;
+        }
+        $('form-error').style.display = 'none';
+        savePendingStart(eventId, stageName, playerName, startMin, startSec);
+        // Show brief confirmation
+        const info = $('saved-start-info');
+        info.textContent = `⏱ Start time saved for ${playerName}`;
+        info.style.display = 'block';
+        setTimeout(() => { info.style.display = 'none'; }, 3000);
+        // Reset shooter dropdown to allow entering another
+        $('player-name').value = '';
+        $('run-start-min').value = '';
+        $('run-start-sec').value = '';
+        $('run-finish-min').value = '';
+        $('run-finish-sec').value = '';
+        showShooterDivision();
+        updateActiveRunners();
+    });
+
+    // --- Active runners toggle (expand/collapse) ---
+    $('active-runners-toggle').addEventListener('click', () => {
+        const list = $('active-runners-list');
+        const chevron = document.querySelector('.active-runners-chevron');
+        if (list.style.display === 'none') {
+            list.style.display = '';
+            if (chevron) chevron.textContent = '▾';
+        } else {
+            list.style.display = 'none';
+            if (chevron) chevron.textContent = '▸';
+        }
+    });
 
     // --- Scores tab ---
     $('sync-btn').addEventListener('click', syncScores);
@@ -575,6 +723,10 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             await dbReady;
             await saveScore(score);
+            // Clear pending start if this was a Run Time score
+            if (score.stageType === 'run_time' && score.eventId) {
+                clearPendingStart(score.eventId, score.stage, score.playerName);
+            }
             const savedStage  = $('stage').value;
             const savedPlayer = $('player-name').value;
             $('score-form').reset();
@@ -584,6 +736,9 @@ document.addEventListener('DOMContentLoaded', () => {
             toggleDNFFields();
             await updateUI();
             updateScoredShooterStyles();
+            updateActiveRunners();
+            // Hide saved-start info banner
+            if ($('saved-start-info')) $('saved-start-info').style.display = 'none';
         } catch (err) {
             console.error('Save error:', err);
             alert('Error saving score: ' + err.message);
