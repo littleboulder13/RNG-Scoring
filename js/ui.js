@@ -383,8 +383,8 @@ function renderEditStagesList() {
                     <option value="standard_rng"${(s.type || 'standard_rng') === 'standard_rng' ? ' selected' : ''}>Standard RNG Stage</option>
                     <option value="run_time"${s.type === 'run_time' ? ' selected' : ''}>Run Time</option>
                 </select>
-                <input type="number" class="edit-targets" value="${s.targets}" placeholder="# targets" min="0" style="width:100px">
-                <input type="number" class="edit-par" value="${s.par}" placeholder="PAR (s)" min="0" step="0.01" style="width:100px">
+                <input type="number" class="edit-targets" value="${s.targets}" placeholder="# targets" min="0" style="width:100px${(s.type || 'standard_rng') === 'run_time' ? ';display:none' : ''}">
+                <input type="number" class="edit-par" value="${s.par}" placeholder="PAR (s)" min="0" step="0.01" style="width:100px${(s.type || 'standard_rng') === 'run_time' ? ';display:none' : ''}">
                 <div class="edit-actions">
                     <button class="btn-save-edit" data-name="${s.name}">Save</button>
                     <button class="btn-cancel-edit">Cancel</button>
@@ -423,6 +423,22 @@ function renderEditStagesList() {
         });
     });
 
+    // Toggle targets/par visibility + default name on type change in inline edit
+    el.querySelectorAll('.edit-type').forEach(sel => {
+        sel.addEventListener('change', () => {
+            const row = sel.closest('.competitor-item');
+            const isRT = sel.value === 'run_time';
+            row.querySelector('.edit-targets').style.display = isRT ? 'none' : '';
+            row.querySelector('.edit-par').style.display     = isRT ? 'none' : '';
+            if (isRT) {
+                row.querySelector('.edit-targets').value = '';
+                row.querySelector('.edit-par').value = '';
+                var nameInput = row.querySelector('.edit-name');
+                if (!nameInput.value.trim()) nameInput.value = 'Run Time';
+            }
+        });
+    });
+
     // Save edit
     el.querySelectorAll('.btn-save-edit').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -447,8 +463,8 @@ function renderEditStagesList() {
             evNow.stages[idx] = {
                 name: newName,
                 type:    newType,
-                targets: row.querySelector('.edit-targets').value.trim(),
-                par:     row.querySelector('.edit-par').value.trim()
+                targets: newType === 'run_time' ? '' : row.querySelector('.edit-targets').value.trim(),
+                par:     newType === 'run_time' ? '' : row.querySelector('.edit-par').value.trim()
             };
             updateEvent(editingEventId, { stages: evNow.stages });
             renderEditStagesList();

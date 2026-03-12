@@ -425,8 +425,20 @@ document.addEventListener('DOMContentLoaded', () => {
         $('edit-stage-name').value = '';
         $('edit-stage-type').value = 'standard_rng';
         $('edit-stage-targets').value = '';
+        $('edit-stage-targets').style.display = '';
         $('edit-stage-par').value = '';
+        $('edit-stage-par').style.display = '';
         renderEditStagesList();
+    });
+    $('edit-stage-type').addEventListener('change', () => {
+        const isRunTime = $('edit-stage-type').value === 'run_time';
+        $('edit-stage-targets').style.display = isRunTime ? 'none' : '';
+        $('edit-stage-par').style.display     = isRunTime ? 'none' : '';
+        if (isRunTime) {
+            $('edit-stage-targets').value = '';
+            $('edit-stage-par').value = '';
+            if (!$('edit-stage-name').value.trim()) $('edit-stage-name').value = 'Run Time';
+        }
     });
     $('edit-stage-name').addEventListener('keypress', e => {
         if (e.key === 'Enter') { e.preventDefault(); $('edit-add-stage-btn').click(); }
