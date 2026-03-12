@@ -16,8 +16,8 @@ function initHmsInput(inputEl) {
     if (!inputEl) return;
 
     inputEl.addEventListener('input', () => {
-        const raw = inputEl.value.replace(/\D/g, '').slice(0, 6);   // digits only, max 6
-        const padded = raw.padStart(6, '0');                         // right-align digits
+        const raw = inputEl.value.replace(/\D/g, '').slice(-6);   // digits only, keep last 6
+        const padded = raw.padStart(6, '0');                       // right-align digits
         const hh = padded.slice(0, 2);
         const mm = padded.slice(2, 4);
         const ss = padded.slice(4, 6);
@@ -42,7 +42,7 @@ function initMsInput(inputEl) {
     if (!inputEl) return;
 
     inputEl.addEventListener('input', () => {
-        const raw = inputEl.value.replace(/\D/g, '').slice(0, 4);
+        const raw = inputEl.value.replace(/\D/g, '').slice(-4);   // digits only, keep last 4
         const padded = raw.padStart(4, '0');
         const mm = padded.slice(0, 2);
         const ss = padded.slice(2, 4);
