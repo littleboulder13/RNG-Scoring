@@ -16,13 +16,12 @@ function initHmsInput(inputEl) {
     if (!inputEl) return;
 
     inputEl.addEventListener('input', () => {
-        const raw = inputEl.value.replace(/\D/g, '');   // digits only
-        let formatted = '';
-        for (let i = 0; i < raw.length && i < 6; i++) {
-            if (i === 2 || i === 4) formatted += ':';
-            formatted += raw[i];
-        }
-        inputEl.value = formatted;
+        const raw = inputEl.value.replace(/\D/g, '').slice(0, 6);   // digits only, max 6
+        const padded = raw.padStart(6, '0');                         // right-align digits
+        const hh = padded.slice(0, 2);
+        const mm = padded.slice(2, 4);
+        const ss = padded.slice(4, 6);
+        inputEl.value = raw.length ? `${hh}:${mm}:${ss}` : '';
     });
 
     // Prevent non-digit keys (allow navigation, backspace, tab, etc.)
