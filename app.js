@@ -301,7 +301,8 @@ document.addEventListener('DOMContentLoaded', () => {
     $('create-event-btn').addEventListener('click', async () => {
         const name = $('new-event-name').value.trim();
         if (!name) { alert('Please enter an event name.'); return; }
-        const event = createEvent(name);
+        const scoringMethod = $('new-event-scoring').value;
+        const event = createEvent(name, scoringMethod);
         pushEventConfig(event.id);
         $('new-event-name').value = '';
         renderEventOverlay();

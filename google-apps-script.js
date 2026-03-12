@@ -1,6 +1,6 @@
 /**
  * =============================================================
- * Stilly Run 'N Gun — Google Apps Script (v109)
+ * Stilly Run 'N Gun — Google Apps Script (v110)
  *
  * Each event gets its own Google Spreadsheet in a Drive folder.
  * The master spreadsheet stores event metadata (Events tab) and
@@ -192,6 +192,7 @@ function _syncScores(ss, data) {
   var scores = Array.isArray(data.scores) ? data.scores : [];
   var eventId = data.eventId || '';
   var eventName = data.eventName || 'Unknown Event';
+  var scoringMethod = data.scoringMethod || 'percentile_dnf0';
   var competitors = Array.isArray(data.competitors) ? data.competitors : [];
   var stages = Array.isArray(data.stages) ? data.stages : [];
 
@@ -371,7 +372,7 @@ function _syncScores(ss, data) {
   }
 
   // Build results tabs per division
-  _buildResultsTabs(eventSS, stageNames, allScores, competitors);
+  _buildResultsTabs(eventSS, stageNames, allScores, competitors, scoringMethod);
 
   return _jsonResponse({ success: true, count: totalSynced });
 }
@@ -381,7 +382,12 @@ function _syncScores(ss, data) {
    Percentile = (fastest_time_in_division / shooter_time) × 100
    DNF = 0%.  Overall = sum of stage percentiles.
    ============================================================= */
-function _buildResultsTabs(eventSS, stageNames, allScores, competitors) {
+var SCORING_METHODS = {
+  'percentile_dnf0': 'Percentile Scoring, DNF=0'
+};
+
+function _buildResultsTabs(eventSS, stageNames, allScores, competitors, scoringMethod) {
+  var methodLabel = SCORING_METHODS[scoringMethod] || SCORING_METHODS['percentile_dnf0'];
   // Build shooter → division map
   var shooterDiv = {};
   for (var i = 0; i < competitors.length; i++) {
@@ -466,6 +472,7 @@ function _buildResultsTabs(eventSS, stageNames, allScores, competitors) {
       headers.push(stageNames[s4] + ' Rank');
     }
     headers.push('Overall %');
+    headers.push('Scoring Method');
     var totalCols = headers.length;
 
     // Build rows
@@ -478,6 +485,7 @@ function _buildResultsTabs(eventSS, stageNames, allScores, competitors) {
         row.push(res.stageRanks[s5]);
       }
       row.push(Math.round(res.total * 100) / 100);
+      row.push(r === 0 ? methodLabel : '');  // Show scoring method label in first row only
       rows.push(row);
     }
 
@@ -514,7 +522,7 @@ function _pushEvent(ss, ev) {
   var sheet = ss.getSheetByName('Events') || ss.getSheetByName('_Events');
   if (!sheet) {
     sheet = ss.insertSheet('Events');
-    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password', 'SpreadsheetId'];
+    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password', 'SpreadsheetId', 'ScoringMethod'];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.getRange(1, 1, 1, headers.length)
       .setFontWeight('bold')
@@ -533,6 +541,18 @@ function _pushEvent(ss, ev) {
     ssIdCol = hdrs.length;
     sheet.getRange(1, ssIdCol + 1).setValue('SpreadsheetId');
     sheet.getRange(1, ssIdCol + 1).setFontWeight('bold').setBackground('#1565c0').setFontColor('#ffffff');
+    hdrs = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  }
+
+  // Ensure ScoringMethod column exists
+  var smCol = -1;
+  for (var c2 = 0; c2 < hdrs.length; c2++) {
+    if (String(hdrs[c2]).toLowerCase().replace(/\s+/g, '') === 'scoringmethod') { smCol = c2; break; }
+  }
+  if (smCol === -1) {
+    smCol = sheet.getLastColumn();
+    sheet.getRange(1, smCol + 1).setValue('ScoringMethod');
+    sheet.getRange(1, smCol + 1).setFontWeight('bold').setBackground('#1565c0').setFontColor('#ffffff');
   }
 
   // Find existing row
@@ -565,15 +585,19 @@ function _pushEvent(ss, ev) {
     }
   }
 
-  var row = [
-    ev.id,
-    ev.name || '',
-    JSON.stringify(ev.stages || []),
-    JSON.stringify(ev.competitors || []),
-    new Date().toISOString(),
-    ev.password || '',
-    existingSsId
-  ];
+  // Build full row up to the last known column (smCol is furthest right)
+  var totalEvtCols = Math.max(ssIdCol, smCol) + 1;
+  var row = new Array(totalEvtCols);
+  row[0] = ev.id;
+  row[1] = ev.name || '';
+  row[2] = JSON.stringify(ev.stages || []);
+  row[3] = JSON.stringify(ev.competitors || []);
+  row[4] = new Date().toISOString();
+  row[5] = ev.password || '';
+  row[ssIdCol] = existingSsId;
+  row[smCol] = ev.scoringMethod || 'percentile_dnf0';
+  // Fill any undefined slots
+  for (var fi = 0; fi < row.length; fi++) { if (row[fi] === undefined) row[fi] = ''; }
 
   if (existingRow > 0) {
     sheet.getRange(existingRow, 1, 1, row.length).setValues([row]);
@@ -620,6 +644,7 @@ function _pullEvents() {
     var compCol   = colIdx['competitors'] !== undefined ? colIdx['competitors'] : 3;
     var pwCol     = colIdx['password'] !== undefined ? colIdx['password'] : 5;
     var ssIdCol   = colIdx['spreadsheetid'] !== undefined ? colIdx['spreadsheetid'] : -1;
+    var smCol     = colIdx['scoringmethod'] !== undefined ? colIdx['scoringmethod'] : -1;
 
     return {
       id:            row[idCol],
@@ -627,7 +652,8 @@ function _pullEvents() {
       stages:        safeParse(row[stagesCol], []),
       competitors:   safeParse(row[compCol], []),
       password:      row[pwCol] || '',
-      spreadsheetId: ssIdCol >= 0 ? (row[ssIdCol] || '') : ''
+      spreadsheetId: ssIdCol >= 0 ? (row[ssIdCol] || '') : '',
+      scoringMethod: smCol >= 0 ? (row[smCol] || 'percentile_dnf0') : 'percentile_dnf0'
     };
   });
 
@@ -667,13 +693,19 @@ function _archiveEvent(ss, eventId) {
   var archiveSheet = ss.getSheetByName('ArchivedEvents');
   if (!archiveSheet) {
     archiveSheet = ss.insertSheet('ArchivedEvents');
-    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password', 'SpreadsheetId', 'ArchivedAt'];
+    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password', 'SpreadsheetId', 'ScoringMethod', 'ArchivedAt'];
     archiveSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     archiveSheet.getRange(1, 1, 1, headers.length)
       .setFontWeight('bold')
       .setBackground('#795548')
       .setFontColor('#ffffff');
     archiveSheet.setFrozenRows(1);
+  }
+
+  // Find ScoringMethod column
+  var smCol = -1;
+  for (var c2 = 0; c2 < hdrs.length; c2++) {
+    if (String(hdrs[c2]).toLowerCase().replace(/\s+/g, '') === 'scoringmethod') { smCol = c2; break; }
   }
 
   var archiveRow = [
@@ -684,6 +716,7 @@ function _archiveEvent(ss, eventId) {
     rowData[4],                          // Updated
     rowData[5],                          // Password
     ssIdCol >= 0 ? (rowData[ssIdCol] || '') : '',  // SpreadsheetId
+    smCol >= 0 ? (rowData[smCol] || 'percentile_dnf0') : 'percentile_dnf0',  // ScoringMethod
     new Date().toISOString()             // ArchivedAt
   ];
   archiveSheet.getRange(archiveSheet.getLastRow() + 1, 1, 1, archiveRow.length).setValues([archiveRow]);
@@ -725,13 +758,19 @@ function _restoreEvent(ss, eventId) {
   var sheet = ss.getSheetByName('Events') || ss.getSheetByName('_Events');
   if (!sheet) {
     sheet = ss.insertSheet('Events');
-    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password', 'SpreadsheetId'];
+    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password', 'SpreadsheetId', 'ScoringMethod'];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.getRange(1, 1, 1, headers.length)
       .setFontWeight('bold')
       .setBackground('#1565c0')
       .setFontColor('#ffffff');
     sheet.setFrozenRows(1);
+  }
+
+  // Find ScoringMethod column in archive
+  var archSmCol = -1;
+  for (var c2 = 0; c2 < archHdrs.length; c2++) {
+    if (String(archHdrs[c2]).toLowerCase().replace(/\s+/g, '') === 'scoringmethod') { archSmCol = c2; break; }
   }
 
   var restoreRow = [
@@ -741,7 +780,8 @@ function _restoreEvent(ss, eventId) {
     rowData[3],                                           // Competitors
     new Date().toISOString(),                             // Updated
     rowData[5],                                           // Password
-    archSsIdCol >= 0 ? (rowData[archSsIdCol] || '') : '' // SpreadsheetId
+    archSsIdCol >= 0 ? (rowData[archSsIdCol] || '') : '', // SpreadsheetId
+    archSmCol >= 0 ? (rowData[archSmCol] || 'percentile_dnf0') : 'percentile_dnf0'  // ScoringMethod
   ];
   sheet.getRange(sheet.getLastRow() + 1, 1, 1, restoreRow.length).setValues([restoreRow]);
   archiveSheet.deleteRow(rowIndex);

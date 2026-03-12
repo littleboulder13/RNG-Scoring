@@ -49,11 +49,12 @@ function saveEvents(list) {
     localStorage.setItem('rng_events', JSON.stringify(list));
 }
 
-function createEvent(name) {
+function createEvent(name, scoringMethod) {
     const events = getEvents();
     const event = {
         id:          Date.now().toString(36) + Math.random().toString(36).substr(2, 6),
         name,
+        scoringMethod: scoringMethod || 'percentile_dnf0',
         stages:      [],
         competitors: []
     };

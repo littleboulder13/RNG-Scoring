@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v109';
+const APP_VERSION = 'v110';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxDwug8yxfGbuqVKWUb7WTZh89NJQzp5ZaIIC3aPs4w4iiWogk0Yvg7M9ASgy70NOkW/exec';
 
 function getSyncUrl() {
@@ -315,6 +315,7 @@ async function syncScores() {
             action: 'syncScores',
             eventId: event ? event.id : '',
             eventName,
+            scoringMethod: event ? (event.scoringMethod || 'percentile_dnf0') : 'percentile_dnf0',
             scores: pending,
             competitors,
             stages

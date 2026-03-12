@@ -243,6 +243,7 @@ function openEventEditor(eventId) {
     $('event-editor-title').textContent = `Edit: ${ev.name}`;
     $('edit-event-name').value = ev.name;
     $('edit-event-password').value = ev.password || '';
+    $('edit-event-scoring').value = ev.scoringMethod || 'percentile_dnf0';
     renderEditCompetitorsList();
     renderEditStagesList();
 
@@ -265,7 +266,8 @@ function saveEventEditorFields() {
     const name = $('edit-event-name').value.trim();
     if (!name) return;
     const password = ($('edit-event-password').value || '').trim();
-    updateEvent(editingEventId, { name, password });
+    const scoringMethod = $('edit-event-scoring').value || 'percentile_dnf0';
+    updateEvent(editingEventId, { name, password, scoringMethod });
 }
 
 function renderEditCompetitorsList() {
