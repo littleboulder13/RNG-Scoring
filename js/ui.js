@@ -16,22 +16,37 @@ function initHmsInput(inputEl) {
     if (!inputEl) return;
 
     inputEl.addEventListener('input', () => {
-        const raw = inputEl.value.replace(/\D/g, '').slice(-6);   // digits only, keep last 6
-        const padded = raw.padStart(6, '0');                       // right-align digits
+        const raw = inputEl.value.replace(/\D/g, '').slice(-6);
+        const padded = raw.padStart(6, '0');
         const hh = padded.slice(0, 2);
         const mm = padded.slice(2, 4);
         const ss = padded.slice(4, 6);
         inputEl.value = raw.length ? `${hh}:${mm}:${ss}` : '';
+        // Force cursor to end so there's only one typing position
+        const len = inputEl.value.length;
+        inputEl.setSelectionRange(len, len);
     });
 
     // Prevent non-digit keys (allow navigation, backspace, tab, etc.)
     inputEl.addEventListener('keydown', (e) => {
-        // Allow: backspace, delete, tab, escape, enter, arrows, home, end
-        if ([8, 9, 13, 27, 46, 37, 38, 39, 40, 35, 36].includes(e.keyCode)) return;
+        // Allow: backspace, delete, tab, escape, enter
+        if ([8, 9, 13, 27, 46].includes(e.keyCode)) return;
         // Allow Ctrl/Cmd + A, C, V, X
         if ((e.ctrlKey || e.metaKey) && [65, 67, 86, 88].includes(e.keyCode)) return;
-        // Block anything that isn't a digit
+        // Block anything that isn't a digit (including arrows so cursor stays at end)
         if (e.key < '0' || e.key > '9') e.preventDefault();
+    });
+
+    // Keep cursor at end on click/focus
+    inputEl.addEventListener('focus', () => {
+        setTimeout(() => {
+            const len = inputEl.value.length;
+            inputEl.setSelectionRange(len, len);
+        }, 0);
+    });
+    inputEl.addEventListener('click', () => {
+        const len = inputEl.value.length;
+        inputEl.setSelectionRange(len, len);
     });
 }
 
@@ -42,17 +57,30 @@ function initMsInput(inputEl) {
     if (!inputEl) return;
 
     inputEl.addEventListener('input', () => {
-        const raw = inputEl.value.replace(/\D/g, '').slice(-4);   // digits only, keep last 4
+        const raw = inputEl.value.replace(/\D/g, '').slice(-4);
         const padded = raw.padStart(4, '0');
         const mm = padded.slice(0, 2);
         const ss = padded.slice(2, 4);
         inputEl.value = raw.length ? `${mm}:${ss}` : '';
+        const len = inputEl.value.length;
+        inputEl.setSelectionRange(len, len);
     });
 
     inputEl.addEventListener('keydown', (e) => {
-        if ([8, 9, 13, 27, 46, 37, 38, 39, 40, 35, 36].includes(e.keyCode)) return;
+        if ([8, 9, 13, 27, 46].includes(e.keyCode)) return;
         if ((e.ctrlKey || e.metaKey) && [65, 67, 86, 88].includes(e.keyCode)) return;
         if (e.key < '0' || e.key > '9') e.preventDefault();
+    });
+
+    inputEl.addEventListener('focus', () => {
+        setTimeout(() => {
+            const len = inputEl.value.length;
+            inputEl.setSelectionRange(len, len);
+        }, 0);
+    });
+    inputEl.addEventListener('click', () => {
+        const len = inputEl.value.length;
+        inputEl.setSelectionRange(len, len);
     });
 }
 
