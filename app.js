@@ -536,7 +536,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 ['Start Time', score.startTimeFormatted],
                 ['Finish Time', score.finishTimeFormatted],
                 ['Run Time (s)', score.time],
-                ['Wait Time', waitStr],
                 ['Notes', score.notes || '—']
             ];
         } else {
@@ -618,14 +617,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const runTime = Math.round((finTotal - startTotal) * 100) / 100;
 
-            // Wait time warning (> 30 minutes)
-            const waitMinutes = (parseInt($('wait-time-min').value) || 0);
-            const waitSeconds = (parseInt($('wait-time-sec').value) || 0);
-            const totalWaitMin = waitMinutes + waitSeconds / 60;
-            if (totalWaitMin > 30) {
-                if (!confirm(`Wait time is over 30 minutes (${waitMinutes}m ${waitSeconds}s).\n\nAre you sure this is correct?`)) return;
-            }
-
             $('form-error').style.display = 'none';
 
             const playerName = $('player-name').value;
@@ -653,8 +644,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 finishTime:            finTotal,
                 startTimeFormatted:    fmtStart,
                 finishTimeFormatted:   fmtFinish,
-                waitTime:              (parseInt($('wait-time-min').value) || 0) * 60
-                                     + (parseInt($('wait-time-sec').value) || 0),
+                waitTime:              0,
                 targetsNotNeutralized: 0,
                 dnf:                   false,
                 notes:                 $('notes').value

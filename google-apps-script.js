@@ -212,7 +212,7 @@ function _syncScores(ss, data) {
   var BASE_HEADERS = ['#', 'Shooter', 'Division'];
   var STD_SCORE_HEADERS = ['Time (s)', 'Targets Not Neutralized', 'Wait Time (m:ss)', 'Wait Time (s)', 'Notes'];
   var STD_SCORE_COLS = STD_SCORE_HEADERS.length;
-  var RT_SCORE_HEADERS = ['Start Time (m:ss)', 'Start Time (s)', 'Finish Time (m:ss)', 'Finish Time (s)', 'Run Time (s)', 'Wait Time (m:ss)', 'Wait Time (s)', 'Notes'];
+  var RT_SCORE_HEADERS = ['Start Time (m:ss)', 'Start Time (s)', 'Finish Time (m:ss)', 'Finish Time (s)', 'Run Time (s)', 'Notes'];
   var RT_SCORE_COLS = RT_SCORE_HEADERS.length;
 
   // Build stage name → type lookup
@@ -286,9 +286,7 @@ function _syncScores(ss, data) {
               finishTimeFmt: existData[ex][off + 2] || '',
               finishTimeSec: existData[ex][off + 3] || 0,
               runTime: existData[ex][off + 4] || 0,
-              waitTime: existData[ex][off + 5] || '',
-              waitTimeSec: existData[ex][off + 6] || 0,
-              notes: existData[ex][off + 7] || ''
+              notes: existData[ex][off + 5] || ''
             });
           } else {
             exScores.push({
@@ -317,8 +315,6 @@ function _syncScores(ss, data) {
           finishTimeFmt: sc.finishTimeFormatted || fmtWait(sc.finishTime || 0),
           finishTimeSec: sc.finishTime || 0,
           runTime: sc.time || 0,
-          waitTime: fmtWait(waitSec),
-          waitTimeSec: waitSec,
           notes: sc.notes || ''
         };
       } else {
@@ -387,7 +383,7 @@ function _syncScores(ss, data) {
         if (entry && sb < entry.scores.length) {
           var sc2 = entry.scores[sb];
           if (isRunTime) {
-            row.push(sc2.startTimeFmt, sc2.startTimeSec, sc2.finishTimeFmt, sc2.finishTimeSec, sc2.runTime, sc2.waitTime, sc2.waitTimeSec, sc2.notes);
+            row.push(sc2.startTimeFmt, sc2.startTimeSec, sc2.finishTimeFmt, sc2.finishTimeSec, sc2.runTime, sc2.notes);
           } else {
             row.push(sc2.time, sc2.tnt, sc2.waitTime, sc2.waitTimeSec, sc2.notes);
           }

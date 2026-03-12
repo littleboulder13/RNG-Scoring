@@ -111,8 +111,13 @@ function toggleStageTypeFields() {
     if ($('tnt-row'))    $('tnt-row').style.display     = isStandard && dnf ? '' : 'none';
     if ($('time'))       $('time').required = isStandard && !dnf;
 
-    // Wait time — shown for both types
-    // (keep visible)
+    // Wait time — hidden for Run Time
+    const waitTimeRow = document.querySelector('.form-group:has(#wait-time-min)');
+    if (waitTimeRow) waitTimeRow.style.display = isRunTime ? 'none' : '';
+    if (isRunTime) {
+        if ($('wait-time-min')) $('wait-time-min').value = '';
+        if ($('wait-time-sec')) $('wait-time-sec').value = '';
+    }
 
     // Run Time fields
     if ($('run-time-start-row'))  $('run-time-start-row').style.display  = isRunTime ? '' : 'none';
@@ -170,7 +175,7 @@ async function updateUI() {
                 <div class="score-value ${s.dnf ? 'dnf' : ''}">${s.dnf ? 'DNF' : s.time + 's'}</div>
                 <div class="score-stats">
                     ${s.stageType === 'run_time' ? `<span>${s.startTimeFormatted || ''} → ${s.finishTimeFormatted || ''}</span>` : ''}
-                    <span>Wait: ${formatWaitTime(s.waitTime)}</span>
+                    ${s.stageType !== 'run_time' ? `<span>Wait: ${formatWaitTime(s.waitTime)}</span>` : ''}
                     ${s.stageType !== 'run_time' ? `<span>TNT: ${s.targetsNotNeutralized}</span>` : ''}
                 </div>
             </div>
