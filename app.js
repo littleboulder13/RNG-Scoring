@@ -749,6 +749,7 @@ document.addEventListener('DOMContentLoaded', () => {
             $('player-name').value = savedPlayer;
             showShooterDivision();
             toggleDNFFields();
+            toggleStageTypeFields();
             await updateUI();
             updateScoredShooterStyles();
             updateActiveRunners();
