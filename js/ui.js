@@ -92,6 +92,45 @@ function toggleDNFFields() {
     if ($('dnf-group')) $('dnf-group').classList.toggle('dnf-active', dnf);
 }
 
+function getSelectedStageType() {
+    const stageName = $('stage')?.value;
+    if (!stageName) return 'standard_rng';
+    const stage = getStages().find(s => s.name === stageName);
+    return stage?.type || 'standard_rng';
+}
+
+function toggleStageTypeFields() {
+    const stageType = getSelectedStageType();
+    const isRunTime = stageType === 'run_time';
+    const isStandard = !isRunTime;
+    const dnf = $('dnf').checked;
+
+    // Standard RNG fields
+    if ($('dnf-group'))  $('dnf-group').style.display  = isStandard ? '' : 'none';
+    if ($('time-row'))   $('time-row').style.display    = isStandard && !dnf ? '' : 'none';
+    if ($('tnt-row'))    $('tnt-row').style.display     = isStandard && dnf ? '' : 'none';
+    if ($('time'))       $('time').required = isStandard && !dnf;
+
+    // Wait time — shown for both types
+    // (keep visible)
+
+    // Run Time fields
+    if ($('run-time-start-row'))  $('run-time-start-row').style.display  = isRunTime ? '' : 'none';
+    if ($('run-time-finish-row')) $('run-time-finish-row').style.display = isRunTime ? '' : 'none';
+
+    // Clear hidden fields when switching
+    if (isRunTime) {
+        if ($('time')) $('time').value = '';
+        if ($('targets-not-neutralized')) $('targets-not-neutralized').value = '0';
+        if ($('dnf')) $('dnf').checked = false;
+    } else {
+        if ($('run-start-min')) $('run-start-min').value = '';
+        if ($('run-start-sec')) $('run-start-sec').value = '';
+        if ($('run-finish-min')) $('run-finish-min').value = '';
+        if ($('run-finish-sec')) $('run-finish-sec').value = '';
+    }
+}
+
 // --- Scores Display ---
 async function updateUI() {
     const scores  = await getEventScores();
@@ -130,8 +169,9 @@ async function updateUI() {
             <div class="score-details">
                 <div class="score-value ${s.dnf ? 'dnf' : ''}">${s.dnf ? 'DNF' : s.time + 's'}</div>
                 <div class="score-stats">
+                    ${s.stageType === 'run_time' ? `<span>${s.startTimeFormatted || ''} → ${s.finishTimeFormatted || ''}</span>` : ''}
                     <span>Wait: ${formatWaitTime(s.waitTime)}</span>
-                    <span>TNT: ${s.targetsNotNeutralized}</span>
+                    ${s.stageType !== 'run_time' ? `<span>TNT: ${s.targetsNotNeutralized}</span>` : ''}
                 </div>
             </div>
         </div>`;
@@ -318,7 +358,7 @@ function renderEditStagesList() {
         return;
     }
 
-    var STAGE_TYPE_LABELS = { 'standard_rng': 'Standard RNG Stage' };
+    var STAGE_TYPE_LABELS = { 'standard_rng': 'Standard RNG Stage', 'run_time': 'Run Time' };
     el.innerHTML = ev.stages.map(s => {
         const typeLabel = STAGE_TYPE_LABELS[s.type || 'standard_rng'] || s.type || 'Standard RNG Stage';
         const meta = [
@@ -341,6 +381,7 @@ function renderEditStagesList() {
                 <input type="text" class="edit-name" value="${s.name}" placeholder="Stage name">
                 <select class="edit-type" style="width:180px">
                     <option value="standard_rng"${(s.type || 'standard_rng') === 'standard_rng' ? ' selected' : ''}>Standard RNG Stage</option>
+                    <option value="run_time"${s.type === 'run_time' ? ' selected' : ''}>Run Time</option>
                 </select>
                 <input type="number" class="edit-targets" value="${s.targets}" placeholder="# targets" min="0" style="width:100px">
                 <input type="number" class="edit-par" value="${s.par}" placeholder="PAR (s)" min="0" step="0.01" style="width:100px">
@@ -397,9 +438,15 @@ function renderEditStagesList() {
             }
             const idx = evNow.stages.findIndex(s => s.name === oldName);
             if (idx === -1) return;
+            const newType = row.querySelector('.edit-type').value || 'standard_rng';
+            if (newType === 'run_time' && (evNow.stages[idx].type || 'standard_rng') !== 'run_time'
+                && evNow.stages.some(s => (s.type || 'standard_rng') === 'run_time')) {
+                alert('Only one Run Time stage is allowed per event.');
+                return;
+            }
             evNow.stages[idx] = {
                 name: newName,
-                type:    row.querySelector('.edit-type').value || 'standard_rng',
+                type:    newType,
                 targets: row.querySelector('.edit-targets').value.trim(),
                 par:     row.querySelector('.edit-par').value.trim()
             };

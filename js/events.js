@@ -55,7 +55,9 @@ function createEvent(name, scoringMethod) {
         id:          Date.now().toString(36) + Math.random().toString(36).substr(2, 6),
         name,
         scoringMethod: scoringMethod || 'percentile_dnf0',
-        stages:      [],
+        stages:      [
+            { name: 'Run Time', type: 'run_time', targets: '', par: '' }
+        ],
         competitors: []
     };
     events.push(event);

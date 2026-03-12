@@ -410,9 +410,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const ev = getEventById(editingEventId);
         if (!ev) return;
         if (ev.stages.find(s => s.name === name)) { alert(`Stage "${name}" already exists.`); return; }
+        const stageType = $('edit-stage-type').value || 'standard_rng';
+        if (stageType === 'run_time' && ev.stages.some(s => (s.type || 'standard_rng') === 'run_time')) {
+            alert('Only one Run Time stage is allowed per event.');
+            return;
+        }
         ev.stages.push({
             name,
-            type:    $('edit-stage-type').value || 'standard_rng',
+            type:    stageType,
             targets: $('edit-stage-targets').value.trim(),
             par:     $('edit-stage-par').value.trim()
         });
@@ -430,11 +435,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Score Entry tab ---
     $('stage').addEventListener('change', () => {
         showStageInfo();
+        toggleStageTypeFields();
         updateScoredShooterStyles();
     });
     $('player-name').addEventListener('change', showShooterDivision);
-    $('dnf').addEventListener('change', toggleDNFFields);
+    $('dnf').addEventListener('change', () => {
+        toggleDNFFields();
+        toggleStageTypeFields();
+    });
     toggleDNFFields();
+    toggleStageTypeFields();
 
     // --- Scores tab ---
     $('sync-btn').addEventListener('click', syncScores);
@@ -505,16 +515,30 @@ document.addEventListener('DOMContentLoaded', () => {
         const waitSec = (score.waitTime || 0) % 60;
         const waitStr = waitMin + ':' + String(waitSec).padStart(2, '0');
 
-        const rows = [
-            ['Stage', score.stage],
-            ['Shooter', score.playerName],
-            ['Division', score.division || '—'],
-            ['DNF', score.dnf ? 'Yes' : 'No', score.dnf],
-            ['Time (s)', score.dnf ? 'N/A' : score.time],
-            ['Wait Time', waitStr],
-            ['Targets Not Neutralized', score.targetsNotNeutralized || 0],
-            ['Notes', score.notes || '—']
-        ];
+        let rows;
+        if (score.stageType === 'run_time') {
+            rows = [
+                ['Stage', score.stage],
+                ['Shooter', score.playerName],
+                ['Division', score.division || '—'],
+                ['Start Time', score.startTimeFormatted],
+                ['Finish Time', score.finishTimeFormatted],
+                ['Run Time (s)', score.time],
+                ['Wait Time', waitStr],
+                ['Notes', score.notes || '—']
+            ];
+        } else {
+            rows = [
+                ['Stage', score.stage],
+                ['Shooter', score.playerName],
+                ['Division', score.division || '—'],
+                ['DNF', score.dnf ? 'Yes' : 'No', score.dnf],
+                ['Time (s)', score.dnf ? 'N/A' : score.time],
+                ['Wait Time', waitStr],
+                ['Targets Not Neutralized', score.targetsNotNeutralized || 0],
+                ['Notes', score.notes || '—']
+            ];
+        }
 
         const html = rows.map(r => {
             const valClass = r[2] ? 'confirm-value dnf-flag' : 'confirm-value';
@@ -561,8 +585,74 @@ document.addEventListener('DOMContentLoaded', () => {
         const tnt       = parseInt($('targets-not-neutralized').value) || 0;
         const stageName = $('stage').value;
         const stage     = getStages().find(s => s.name === stageName);
+        const stageType = stage?.type || 'standard_rng';
         const stageTargets = stage?.targets !== '' ? parseInt(stage?.targets) : NaN;
 
+        // --- Run Time stage validation ---
+        if (stageType === 'run_time') {
+            const startMin = parseInt($('run-start-min').value)  || 0;
+            const startSec = parseFloat($('run-start-sec').value) || 0;
+            const finMin   = parseInt($('run-finish-min').value)  || 0;
+            const finSec   = parseFloat($('run-finish-sec').value) || 0;
+            const startTotal = startMin * 60 + startSec;
+            const finTotal   = finMin * 60 + finSec;
+
+            if (finTotal <= startTotal) {
+                const err = $('form-error');
+                err.textContent = 'Finish time must be after start time.';
+                err.style.display = 'block';
+                return;
+            }
+
+            const runTime = Math.round((finTotal - startTotal) * 100) / 100;
+
+            // Wait time warning (> 30 minutes)
+            const waitMinutes = (parseInt($('wait-time-min').value) || 0);
+            const waitSeconds = (parseInt($('wait-time-sec').value) || 0);
+            const totalWaitMin = waitMinutes + waitSeconds / 60;
+            if (totalWaitMin > 30) {
+                if (!confirm(`Wait time is over 30 minutes (${waitMinutes}m ${waitSeconds}s).\n\nAre you sure this is correct?`)) return;
+            }
+
+            $('form-error').style.display = 'none';
+
+            const playerName = $('player-name').value;
+            await dbReady;
+            const existing = await getEventScores();
+            const isDuplicate = existing.some(s => s.playerName === playerName && s.stage === stageName);
+            if (isDuplicate) {
+                const confirmed = confirm(
+                    `A score for "${playerName}" on "${stageName}" has already been recorded.\n\nAre you sure you want to add another entry?`
+                );
+                if (!confirmed) return;
+            }
+
+            const fmtStart = startMin + ':' + String(Math.floor(startSec)).padStart(2, '0');
+            const fmtFinish = finMin + ':' + String(Math.floor(finSec)).padStart(2, '0');
+
+            const score = {
+                eventId:               getActiveEventId(),
+                stage:                 stageName,
+                stageType:             'run_time',
+                playerName,
+                division:              getPlayerDivision($('player-name').value),
+                time:                  runTime,
+                startTime:             startTotal,
+                finishTime:            finTotal,
+                startTimeFormatted:    fmtStart,
+                finishTimeFormatted:   fmtFinish,
+                waitTime:              (parseInt($('wait-time-min').value) || 0) * 60
+                                     + (parseInt($('wait-time-sec').value) || 0),
+                targetsNotNeutralized: 0,
+                dnf:                   false,
+                notes:                 $('notes').value
+            };
+
+            showConfirmScoreModal(score);
+            return;
+        }
+
+        // --- Standard RNG Stage validation ---
         if ($('dnf').checked) {
             // DNF requires TNT > 0 and <= stage targets
             if (!isNaN(stageTargets)) {
@@ -616,6 +706,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const score = {
             eventId:               getActiveEventId(),
             stage:                 stageName,
+            stageType:             'standard_rng',
             playerName,
             division:              getPlayerDivision($('player-name').value),
             time:                  parseFloat($('time').value),

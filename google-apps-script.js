@@ -1,6 +1,6 @@
 /**
  * =============================================================
- * Stilly Run 'N Gun — Google Apps Script (v113)
+ * Stilly Run 'N Gun — Google Apps Script (v114)
  *
  * Each event gets its own Google Spreadsheet in a Drive folder.
  * The master spreadsheet stores event metadata (Events tab) and
@@ -210,8 +210,18 @@ function _syncScores(ss, data) {
   }
 
   var BASE_HEADERS = ['#', 'Shooter', 'Division'];
-  var SCORE_HEADERS = ['Time (s)', 'Targets Not Neutralized', 'Wait Time (m:ss)', 'Wait Time (s)', 'Notes'];
-  var SCORE_COLS = SCORE_HEADERS.length;
+  var STD_SCORE_HEADERS = ['Time (s)', 'Targets Not Neutralized', 'Wait Time (m:ss)', 'Wait Time (s)', 'Notes'];
+  var STD_SCORE_COLS = STD_SCORE_HEADERS.length;
+  var RT_SCORE_HEADERS = ['Start Time (m:ss)', 'Start Time (s)', 'Finish Time (m:ss)', 'Finish Time (s)', 'Run Time (s)', 'Wait Time (m:ss)', 'Wait Time (s)', 'Notes'];
+  var RT_SCORE_COLS = RT_SCORE_HEADERS.length;
+
+  // Build stage name → type lookup
+  var stageTypeMap = {};
+  for (var st = 0; st < stages.length; st++) {
+    var stObj = stages[st];
+    var stName = stObj.name || stObj;
+    stageTypeMap[stName] = (stObj.type || 'standard_rng');
+  }
 
   function fmtWait(totalSec) {
     var m = Math.floor((totalSec || 0) / 60);
@@ -241,6 +251,9 @@ function _syncScores(ss, data) {
 
   for (var si2 = 0; si2 < stageNames.length; si2++) {
     var stage = stageNames[si2];
+    var isRunTime = (stageTypeMap[stage] === 'run_time');
+    var SCORE_HEADERS = isRunTime ? RT_SCORE_HEADERS : STD_SCORE_HEADERS;
+    var SCORE_COLS = isRunTime ? RT_SCORE_COLS : STD_SCORE_COLS;
     // Tab name: just the stage name (no event prefix — it's already its own spreadsheet)
     var tabName = stage.substring(0, 100);
 
@@ -264,15 +277,28 @@ function _syncScores(ss, data) {
         for (var b = 0; b < 50; b++) {
           var off = BASE_HEADERS.length + b * SCORE_COLS;
           if (off >= numCols) break;
-          var timeVal = existData[ex][off];
-          if (timeVal === '' || timeVal === undefined || timeVal === null) break;
-          exScores.push({
-            time: timeVal,
-            tnt: existData[ex][off + 1] || 0,
-            waitTime: existData[ex][off + 2] || '',
-            waitTimeSec: existData[ex][off + 3] || 0,
-            notes: existData[ex][off + 4] || ''
-          });
+          var firstVal = existData[ex][off];
+          if (firstVal === '' || firstVal === undefined || firstVal === null) break;
+          if (isRunTime) {
+            exScores.push({
+              startTimeFmt: existData[ex][off] || '',
+              startTimeSec: existData[ex][off + 1] || 0,
+              finishTimeFmt: existData[ex][off + 2] || '',
+              finishTimeSec: existData[ex][off + 3] || 0,
+              runTime: existData[ex][off + 4] || 0,
+              waitTime: existData[ex][off + 5] || '',
+              waitTimeSec: existData[ex][off + 6] || 0,
+              notes: existData[ex][off + 7] || ''
+            });
+          } else {
+            exScores.push({
+              time: firstVal,
+              tnt: existData[ex][off + 1] || 0,
+              waitTime: existData[ex][off + 2] || '',
+              waitTimeSec: existData[ex][off + 3] || 0,
+              notes: existData[ex][off + 4] || ''
+            });
+          }
         }
         existingMap[exName] = { division: existData[ex][2] || '', scores: exScores };
       }
@@ -283,13 +309,27 @@ function _syncScores(ss, data) {
       var pn = sc.playerName || '';
       if (!pn) continue;
       var waitSec = sc.waitTime || 0;
-      var newScore = {
-        time: sc.dnf ? 'DNF' : (sc.time || 0),
-        tnt: sc.targetsNotNeutralized || 0,
-        waitTime: fmtWait(waitSec),
-        waitTimeSec: waitSec,
-        notes: sc.notes || ''
-      };
+      var newScore;
+      if (isRunTime) {
+        newScore = {
+          startTimeFmt: sc.startTimeFormatted || fmtWait(sc.startTime || 0),
+          startTimeSec: sc.startTime || 0,
+          finishTimeFmt: sc.finishTimeFormatted || fmtWait(sc.finishTime || 0),
+          finishTimeSec: sc.finishTime || 0,
+          runTime: sc.time || 0,
+          waitTime: fmtWait(waitSec),
+          waitTimeSec: waitSec,
+          notes: sc.notes || ''
+        };
+      } else {
+        newScore = {
+          time: sc.dnf ? 'DNF' : (sc.time || 0),
+          tnt: sc.targetsNotNeutralized || 0,
+          waitTime: fmtWait(waitSec),
+          waitTimeSec: waitSec,
+          notes: sc.notes || ''
+        };
+      }
       if (!existingMap[pn]) {
         existingMap[pn] = { division: sc.division || '', scores: [] };
       }
@@ -302,7 +342,8 @@ function _syncScores(ss, data) {
       var emEntry = existingMap[emKey];
       if (emEntry.scores.length > 0) {
         var latest = emEntry.scores[emEntry.scores.length - 1];
-        allScores[stage][emKey] = { time: latest.time, division: emEntry.division };
+        var latestTime = isRunTime ? latest.runTime : latest.time;
+        allScores[stage][emKey] = { time: latestTime, division: emEntry.division };
       }
     }
 
@@ -344,9 +385,14 @@ function _syncScores(ss, data) {
       var row = [ri + 1, comp.name, comp.division];
       for (var sb = 0; sb < maxBlocks; sb++) {
         if (entry && sb < entry.scores.length) {
-          row.push(entry.scores[sb].time, entry.scores[sb].tnt, entry.scores[sb].waitTime, entry.scores[sb].waitTimeSec, entry.scores[sb].notes);
+          var sc2 = entry.scores[sb];
+          if (isRunTime) {
+            row.push(sc2.startTimeFmt, sc2.startTimeSec, sc2.finishTimeFmt, sc2.finishTimeSec, sc2.runTime, sc2.waitTime, sc2.waitTimeSec, sc2.notes);
+          } else {
+            row.push(sc2.time, sc2.tnt, sc2.waitTime, sc2.waitTimeSec, sc2.notes);
+          }
         } else {
-          row.push('', '', '', '', '');
+          for (var pad = 0; pad < SCORE_COLS; pad++) row.push('');
         }
       }
       rows.push(row);
