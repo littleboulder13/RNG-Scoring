@@ -465,15 +465,19 @@ function _buildResultsTabs(eventSS, stageNames, allScores, competitors, scoringM
     // Sort by overall total descending
     results.sort(function(a, b) { return b.total - a.total; });
 
-    // Build headers: Rank | Shooter | Stage1 % | Stage1 Rank | … | Overall %
+    // Build headers: Rank | Shooter | Stage 1 Points | Stage 1 Rank | … | Total Points Scored
     var headers = ['Rank', 'Shooter'];
     for (var s4 = 0; s4 < stageNames.length; s4++) {
-      headers.push(stageNames[s4] + ' %');
-      headers.push(stageNames[s4] + ' Rank');
+      headers.push('Stage ' + (s4 + 1) + ' Points');
+      headers.push('Stage ' + (s4 + 1) + ' Rank');
     }
-    headers.push('Overall %');
+    headers.push('Total Points Scored');
+    headers.push('Final %');
     headers.push('Scoring Method');
     var totalCols = headers.length;
+
+    // Highest total in this division (results already sorted descending)
+    var highestTotal = results.length > 0 ? results[0].total : 0;
 
     // Build rows
     var rows = [];
@@ -485,6 +489,8 @@ function _buildResultsTabs(eventSS, stageNames, allScores, competitors, scoringM
         row.push(res.stageRanks[s5]);
       }
       row.push(Math.round(res.total * 100) / 100);
+      var finalPct = highestTotal > 0 ? (res.total / highestTotal) * 100 : 0;
+      row.push(Math.round(finalPct * 100) / 100);
       row.push(r === 0 ? methodLabel : '');  // Show scoring method label in first row only
       rows.push(row);
     }
