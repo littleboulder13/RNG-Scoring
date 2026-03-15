@@ -749,8 +749,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 ['Shooter', score.playerName],
                 ['Division', score.division || '—'],
                 ['Time (s)', score.time],
-                ['Down 3/Charlie', score.down3 || 0],
-                ['Down 5/Delta', score.down5 || 0],
+                ['Down 1/Charlie', score.down1 || 0],
+                ['Down 3/Delta', score.down3 || 0],
                 ['Misses', score.misses || 0],
                 ['Procedurals', score.procedurals || 0],
                 ['No Shoot', score.noShoot || 0],
@@ -962,15 +962,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const down1       = parseInt($('tp-down1').value) || 0;
             const down3       = parseInt($('tp-down3').value) || 0;
-            const down5       = parseInt($('tp-down5').value) || 0;
             const misses      = parseInt($('tp-misses').value) || 0;
             const procedurals = parseInt($('tp-procedurals').value) || 0;
             const noShoot     = parseInt($('tp-noshoot').value) || 0;
             const fte         = parseInt($('tp-fte').value) || 0;
 
-            // Down3=+3s, Down5=+5s, Miss=+5s, Procedural=+5s, NoShoot=+10s, FTE=+15s
-            const penaltyTime = (down3 * 3) + (down5 * 5) + (misses * 5) + (procedurals * 5) + (noShoot * 10) + (fte * 15);
+            // Down1=+1s, Down3=+3s, Miss=+5s, Procedural=+5s, NoShoot=+10s, FTE=+15s
+            const penaltyTime = (down1 * 1) + (down3 * 3) + (misses * 5) + (procedurals * 5) + (noShoot * 10) + (fte * 15);
             const totalTime = Math.round((tpTime + penaltyTime) * 100) / 100;
 
             $('form-error').style.display = 'none';
@@ -993,8 +993,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 playerName,
                 division:     getPlayerDivision($('player-name').value),
                 time:         tpTime,
+                down1,
                 down3,
-                down5,
                 misses,
                 procedurals,
                 noShoot,
