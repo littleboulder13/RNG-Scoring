@@ -26,7 +26,7 @@
                 <img src="logo.png" alt="Stilly Run 'N Gun" class="event-logo">
                 <h1>Stilly Run 'N Gun</h1>
                 <p>Select an event to continue</p>
-                <span id="app-version" style="font-size:0.75rem;color:#ff0;background:#333;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px;">v131</span>
+                <span id="app-version" style="font-size:0.75rem;color:#ff0;background:#333;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px;">v132</span>
                 <div style="margin-top:10px;display:flex;gap:8px;justify-content:center;">
                     <button id="pull-events-btn" onclick="pullEvents()" style="font-size:0.85rem;padding:6px 14px;border:none;border-radius:6px;background:#1565c0;color:#fff;cursor:pointer;">⬇ Pull from Cloud</button>
                 </div>
@@ -135,7 +135,7 @@
                 <div class="header-brand">
                     <img src="logo.png" alt="" class="header-logo">
                     <h1>Stilly RNG</h1>
-                    <span id="app-version-header" class="app-version-badge">v131</span>
+                    <span id="app-version-header" class="app-version-badge">v132</span>
                 </div>
                 <div id="active-event-bar" class="active-event-bar" style="display:none">
                     📋 <span id="active-event-name"></span>
@@ -276,19 +276,19 @@
                         </div>
                         <div id="tp-fields" style="display:none">
                             <div class="form-group">
-                                <label for="tp-down1">Down 1 <span class="time-format-hint">+1s each</span></label>
-                                <div class="hf-stepper">
-                                    <button type="button" class="hf-step-btn hf-minus" data-target="tp-down1">−</button>
-                                    <input type="number" id="tp-down1" min="0" placeholder="0" class="hf-stepper-input">
-                                    <button type="button" class="hf-step-btn hf-plus" data-target="tp-down1">+</button>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="tp-down3">Down 3 <span class="time-format-hint">+3s each</span></label>
+                                <label for="tp-down3">Down 3/Charlie <span class="time-format-hint">+3s each</span></label>
                                 <div class="hf-stepper">
                                     <button type="button" class="hf-step-btn hf-minus" data-target="tp-down3">−</button>
                                     <input type="number" id="tp-down3" min="0" placeholder="0" class="hf-stepper-input">
                                     <button type="button" class="hf-step-btn hf-plus" data-target="tp-down3">+</button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="tp-down5">Down 5/Delta <span class="time-format-hint">+5s each</span></label>
+                                <div class="hf-stepper">
+                                    <button type="button" class="hf-step-btn hf-minus" data-target="tp-down5">−</button>
+                                    <input type="number" id="tp-down5" min="0" placeholder="0" class="hf-stepper-input">
+                                    <button type="button" class="hf-step-btn hf-plus" data-target="tp-down5">+</button>
                                 </div>
                             </div>
                             <div class="form-group">

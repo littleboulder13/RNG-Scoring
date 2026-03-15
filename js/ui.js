@@ -315,8 +315,8 @@ function clearHitFactorFields() {
 
 function clearTimePlusFields() {
     if ($('tp-time'))        $('tp-time').value = '';
-    if ($('tp-down1'))       $('tp-down1').value = '';
     if ($('tp-down3'))       $('tp-down3').value = '';
+    if ($('tp-down5'))       $('tp-down5').value = '';
     if ($('tp-misses'))      $('tp-misses').value = '';
     if ($('tp-procedurals')) $('tp-procedurals').value = '';
     if ($('tp-ftn'))         $('tp-ftn').value = '';
