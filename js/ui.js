@@ -2,6 +2,12 @@
    UI — Render Lists, Dropdowns, Display Helpers
    ============================================================= */
 
+/** Check if active event uses Spread Scoring */
+function isSpreadScoring() {
+    const ev = typeof getActiveEvent === 'function' ? getActiveEvent() : null;
+    return ev && ev.scoringMethod === 'spread_dnf_neg25';
+}
+
 /* =============================================================
    HH:MM:SS Auto-Format Input Helper
    As the user types digits, colons are inserted automatically.
@@ -221,7 +227,7 @@ function showShooterDivision() {
 function toggleDNFFields() {
     const dnf = $('dnf').checked;
     if ($('time-row'))  $('time-row').style.display  = dnf ? 'none' : '';
-    if ($('tnt-row'))   $('tnt-row').style.display   = dnf ? ''     : 'none';
+    if ($('tnt-row'))   $('tnt-row').style.display   = dnf && !isSpreadScoring() ? ''     : 'none';
     if ($('time'))      $('time').required = !dnf;
     if ($('dnf-group')) $('dnf-group').classList.toggle('dnf-active', dnf);
 }
@@ -244,7 +250,7 @@ function toggleStageTypeFields() {
     // Standard RNG fields
     if ($('dnf-group'))  $('dnf-group').style.display  = isStandard ? '' : 'none';
     if ($('time-row'))   $('time-row').style.display    = isStandard && !dnf ? '' : 'none';
-    if ($('tnt-row'))    $('tnt-row').style.display     = isStandard && dnf ? '' : 'none';
+    if ($('tnt-row'))    $('tnt-row').style.display     = isStandard && dnf && !isSpreadScoring() ? '' : 'none';
     if ($('time'))       $('time').required = isStandard && !dnf;
 
     // Hit Factor fields
@@ -364,7 +370,7 @@ async function updateUI() {
                     ${s.stageType === 'run_time' ? `<span>${s.startTimeFormatted || ''} → ${s.finishTimeFormatted || ''}</span>` : ''}
                     ${s.stageType === 'time_plus' ? `<span>+${s.penaltyTime || 0}s pen → ${s.totalTime || 0}s total</span>` : ''}
                     ${s.stageType !== 'run_time' && s.stageType !== 'hit_factor' && s.stageType !== 'time_plus' ? `<span>Wait: ${formatWaitTime(s.waitTime)}</span>` : ''}
-                    ${s.stageType !== 'run_time' && s.stageType !== 'hit_factor' && s.stageType !== 'time_plus' ? `<span>TNT: ${s.targetsNotNeutralized}</span>` : ''}
+                    ${s.stageType !== 'run_time' && s.stageType !== 'hit_factor' && s.stageType !== 'time_plus' && !isSpreadScoring() ? `<span>TNT: ${s.targetsNotNeutralized}</span>` : ''}
                 </div>
             </div>
         </div>`;

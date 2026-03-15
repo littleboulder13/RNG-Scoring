@@ -1,6 +1,6 @@
 /**
  * =============================================================
- * Stilly Run 'N Gun — Google Apps Script (v135)
+ * Stilly Run 'N Gun — Google Apps Script (v136)
  *
  * Each event gets its own Google Spreadsheet in a Drive folder.
  * The master spreadsheet stores event metadata (Events tab) and
@@ -499,7 +499,8 @@ function _syncScores(ss, data) {
    ============================================================= */
 var SCORING_METHODS = {
   'percentile_dnf0': 'Percentile Scoring, DNF=0',
-  'hit_factor': 'Percentile'
+  'hit_factor': 'Percentile',
+  'spread_dnf_neg25': 'Spread Scoring, DNF=-25'
 };
 
 function _buildResultsTabs(eventSS, stageNames, allScores, competitors, scoringMethod, stages) {
@@ -619,6 +620,87 @@ function _buildResultsTabs(eventSS, stageNames, allScores, competitors, scoringM
           totalPct += pct;
         }
         results.push({ name: player, stageResults: stageResults, stageRanks: [], total: totalPct });
+      }
+
+    } else if (scoringMethod === 'spread_dnf_neg25') {
+      // Spread Scoring: fastest=100, slowest completer=0, linear in between, DNF=-25
+      // For time_plus stages: use totalTime
+      // For hit_factor stages: use hitFactor (higher is better)
+      for (var p2s = 0; p2s < shooters.length; p2s++) {
+        results.push({ name: shooters[p2s], stageResults: [], stageRanks: [], total: 0 });
+      }
+
+      for (var s2s = 0; s2s < stageNames.length; s2s++) {
+        var stgNs = stageNames[s2s];
+        var infS = stageInfo[stgNs] || {};
+        var isTimePlusStg = (infS.type === 'time_plus');
+        var isHitFactorStg = (infS.type === 'hit_factor');
+
+        // Collect valid times for completers in this division
+        var completers = [];
+        for (var ps = 0; ps < shooters.length; ps++) {
+          var scS = allScores[stgNs] && allScores[stgNs][shooters[ps]];
+          if (!scS) continue;
+          if (isTimePlusStg) {
+            if (scS.totalTime > 0) completers.push({ idx: ps, val: scS.totalTime });
+          } else if (isHitFactorStg) {
+            if (scS.hitFactor > 0) completers.push({ idx: ps, val: scS.hitFactor });
+          } else {
+            if (scS.time !== 'DNF' && typeof scS.time === 'number' && scS.time > 0) {
+              completers.push({ idx: ps, val: scS.time });
+            }
+          }
+        }
+
+        // Find best and worst values among completers
+        var bestVal = Infinity, worstVal = -Infinity;
+        if (isHitFactorStg) {
+          // Higher HF is better
+          bestVal = -Infinity; worstVal = Infinity;
+          for (var cv = 0; cv < completers.length; cv++) {
+            if (completers[cv].val > bestVal) bestVal = completers[cv].val;
+            if (completers[cv].val < worstVal) worstVal = completers[cv].val;
+          }
+        } else {
+          // Lower time is better
+          bestVal = Infinity; worstVal = -Infinity;
+          for (var cv = 0; cv < completers.length; cv++) {
+            if (completers[cv].val < bestVal) bestVal = completers[cv].val;
+            if (completers[cv].val > worstVal) worstVal = completers[cv].val;
+          }
+        }
+
+        var spread = isHitFactorStg ? (bestVal - worstVal) : (worstVal - bestVal);
+
+        // Assign points for each shooter
+        for (var ps2 = 0; ps2 < shooters.length; ps2++) {
+          var pts2 = -25; // default DNF
+          var scS2 = allScores[stgNs] && allScores[stgNs][shooters[ps2]];
+          if (scS2) {
+            var completed = false;
+            var shooterVal = 0;
+            if (isTimePlusStg) {
+              if (scS2.totalTime > 0) { completed = true; shooterVal = scS2.totalTime; }
+            } else if (isHitFactorStg) {
+              if (scS2.hitFactor > 0) { completed = true; shooterVal = scS2.hitFactor; }
+            } else {
+              if (scS2.time !== 'DNF' && typeof scS2.time === 'number' && scS2.time > 0) {
+                completed = true; shooterVal = scS2.time;
+              }
+            }
+            if (completed) {
+              if (completers.length <= 1 || spread === 0) {
+                pts2 = 100;
+              } else if (isHitFactorStg) {
+                pts2 = ((shooterVal - worstVal) / spread) * 100;
+              } else {
+                pts2 = ((worstVal - shooterVal) / spread) * 100;
+              }
+            }
+          }
+          results[ps2].stageResults.push(pts2);
+          results[ps2].total += pts2;
+        }
       }
 
     } else {

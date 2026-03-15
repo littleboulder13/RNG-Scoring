@@ -760,6 +760,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 ['Notes', score.notes || '—']
             ];
         } else {
+            const evForConfirm = getActiveEvent();
+            const isSpreadConfirm = evForConfirm && evForConfirm.scoringMethod === 'spread_dnf_neg25';
             rows = [
                 ['Stage', score.stage],
                 ['Shooter', score.playerName],
@@ -767,7 +769,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ['DNF', score.dnf ? 'Yes' : 'No', score.dnf],
                 ['Time (s)', score.dnf ? 'N/A' : score.time],
                 ['Wait Time', waitStr],
-                ['Targets Not Neutralized', score.targetsNotNeutralized || 0],
+                ...(isSpreadConfirm ? [] : [['Targets Not Neutralized', score.targetsNotNeutralized || 0]]),
                 ['Notes', score.notes || '—']
             ];
         }
@@ -1013,19 +1015,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- Standard RNG Stage validation ---
         if ($('dnf').checked) {
-            // DNF requires TNT > 0 and <= stage targets
-            if (!isNaN(stageTargets)) {
-                if (tnt <= 0 || tnt > stageTargets) {
+            // Skip TNT validation for Spread Scoring (no TNT needed)
+            const ev = getActiveEvent();
+            const isSpread = ev && ev.scoringMethod === 'spread_dnf_neg25';
+            if (!isSpread) {
+                // DNF requires TNT > 0 and <= stage targets
+                if (!isNaN(stageTargets)) {
+                    if (tnt <= 0 || tnt > stageTargets) {
+                        const err = $('form-error');
+                        err.textContent = 'Correct Targets Not Neutralized value.';
+                        err.style.display = 'block';
+                        return;
+                    }
+                } else if (tnt <= 0) {
                     const err = $('form-error');
                     err.textContent = 'Correct Targets Not Neutralized value.';
                     err.style.display = 'block';
                     return;
                 }
-            } else if (tnt <= 0) {
-                const err = $('form-error');
-                err.textContent = 'Correct Targets Not Neutralized value.';
-                err.style.display = 'block';
-                return;
             }
         }
 
@@ -1077,7 +1084,7 @@ document.addEventListener('DOMContentLoaded', () => {
             division:              getPlayerDivision($('player-name').value),
             time:                  parseFloat($('time').value),
             waitTime:              parseMsToSeconds($('wait-time').value) || 0,
-            targetsNotNeutralized: tnt,
+            targetsNotNeutralized: (getActiveEvent()?.scoringMethod === 'spread_dnf_neg25') ? 0 : tnt,
             dnf:                   $('dnf').checked,
             notes:                 $('notes').value
         };
