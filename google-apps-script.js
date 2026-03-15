@@ -1,6 +1,6 @@
 /**
  * =============================================================
- * Stilly Run 'N Gun — Google Apps Script (v134)
+ * Stilly Run 'N Gun — Google Apps Script (v135)
  *
  * Each event gets its own Google Spreadsheet in a Drive folder.
  * The master spreadsheet stores event metadata (Events tab) and
@@ -499,7 +499,7 @@ function _syncScores(ss, data) {
    ============================================================= */
 var SCORING_METHODS = {
   'percentile_dnf0': 'Percentile Scoring, DNF=0',
-  'hit_factor': 'Percentile Scoring (Hit Factor)'
+  'hit_factor': 'Percentile'
 };
 
 function _buildResultsTabs(eventSS, stageNames, allScores, competitors, scoringMethod, stages) {
