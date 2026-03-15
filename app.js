@@ -753,7 +753,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 ['Down 5/Delta', score.down5 || 0],
                 ['Misses', score.misses || 0],
                 ['Procedurals', score.procedurals || 0],
-                ['FTN', score.ftn || 0],
+                ['No Shoot', score.noShoot || 0],
+                ['FTE', score.fte || 0],
                 ['Penalty Time', '+' + score.penaltyTime + 's'],
                 ['Total Time', score.totalTime + 's'],
                 ['Notes', score.notes || '—']
@@ -965,10 +966,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const down5       = parseInt($('tp-down5').value) || 0;
             const misses      = parseInt($('tp-misses').value) || 0;
             const procedurals = parseInt($('tp-procedurals').value) || 0;
-            const ftn         = parseInt($('tp-ftn').value) || 0;
+            const noShoot     = parseInt($('tp-noshoot').value) || 0;
+            const fte         = parseInt($('tp-fte').value) || 0;
 
-            // Down3=+3s, Down5=+5s, Miss=+5s, Procedural=+3s, FTN=+5s
-            const penaltyTime = (down3 * 3) + (down5 * 5) + (misses * 5) + (procedurals * 3) + (ftn * 5);
+            // Down3=+3s, Down5=+5s, Miss=+5s, Procedural=+5s, NoShoot=+10s, FTE=+15s
+            const penaltyTime = (down3 * 3) + (down5 * 5) + (misses * 5) + (procedurals * 5) + (noShoot * 10) + (fte * 15);
             const totalTime = Math.round((tpTime + penaltyTime) * 100) / 100;
 
             $('form-error').style.display = 'none';
@@ -995,7 +997,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 down5,
                 misses,
                 procedurals,
-                ftn,
+                noShoot,
+                fte,
                 penaltyTime,
                 totalTime,
                 waitTime:     0,

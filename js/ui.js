@@ -319,7 +319,8 @@ function clearTimePlusFields() {
     if ($('tp-down5'))       $('tp-down5').value = '';
     if ($('tp-misses'))      $('tp-misses').value = '';
     if ($('tp-procedurals')) $('tp-procedurals').value = '';
-    if ($('tp-ftn'))         $('tp-ftn').value = '';
+    if ($('tp-noshoot'))     $('tp-noshoot').value = '';
+    if ($('tp-fte'))         $('tp-fte').value = '';
 }
 
 // --- Scores Display ---

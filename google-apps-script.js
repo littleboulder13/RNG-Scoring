@@ -1,6 +1,6 @@
 /**
  * =============================================================
- * Stilly Run 'N Gun — Google Apps Script (v132)
+ * Stilly Run 'N Gun — Google Apps Script (v133)
  *
  * Each event gets its own Google Spreadsheet in a Drive folder.
  * The master spreadsheet stores event metadata (Events tab) and
@@ -216,7 +216,7 @@ function _syncScores(ss, data) {
   var RT_SCORE_COLS = RT_SCORE_HEADERS.length;
   var HF_SCORE_HEADERS = ['Time (s)', 'Charlies', 'Deltas', 'Mikes', 'Procedurals', 'FTE', 'Total Points', 'Hit Factor', 'Notes'];
   var HF_SCORE_COLS = HF_SCORE_HEADERS.length;
-  var TP_SCORE_HEADERS = ['Time (s)', 'Down 3/Charlie', 'Down 5/Delta', 'Misses', 'Procedurals', 'FTN', 'Penalty Time', 'Total Time', 'Notes'];
+  var TP_SCORE_HEADERS = ['Time (s)', 'Down 3/Charlie', 'Down 5/Delta', 'Misses', 'Procedurals', 'No Shoot', 'FTE', 'Penalty Time', 'Total Time', 'Notes'];
   var TP_SCORE_COLS = TP_SCORE_HEADERS.length;
 
   // Build stage name → type lookup
@@ -321,10 +321,11 @@ function _syncScores(ss, data) {
               down5: existData[ex][off + 2] || 0,
               misses: existData[ex][off + 3] || 0,
               procedurals: existData[ex][off + 4] || 0,
-              ftn: existData[ex][off + 5] || 0,
-              penaltyTime: existData[ex][off + 6] || 0,
-              totalTime: existData[ex][off + 7] || 0,
-              notes: existData[ex][off + 8] || ''
+              noShoot: existData[ex][off + 5] || 0,
+              fte: existData[ex][off + 6] || 0,
+              penaltyTime: existData[ex][off + 7] || 0,
+              totalTime: existData[ex][off + 8] || 0,
+              notes: existData[ex][off + 9] || ''
             });
           } else {
             exScores.push({
@@ -374,7 +375,8 @@ function _syncScores(ss, data) {
           down5: sc.down5 || 0,
           misses: sc.misses || 0,
           procedurals: sc.procedurals || 0,
-          ftn: sc.ftn || 0,
+          noShoot: sc.noShoot || 0,
+          fte: sc.fte || 0,
           penaltyTime: sc.penaltyTime || 0,
           totalTime: sc.totalTime || 0,
           notes: sc.notes || ''
@@ -452,7 +454,7 @@ function _syncScores(ss, data) {
           } else if (isHitFactor) {
             row.push(sc2.time, sc2.charlies, sc2.deltas, sc2.mikes, sc2.procedurals, sc2.fte, sc2.totalPoints, sc2.hitFactor, sc2.notes);
           } else if (isTimePlus) {
-            row.push(sc2.time, sc2.down3, sc2.down5, sc2.misses, sc2.procedurals, sc2.ftn, sc2.penaltyTime, sc2.totalTime, sc2.notes);
+            row.push(sc2.time, sc2.down3, sc2.down5, sc2.misses, sc2.procedurals, sc2.noShoot, sc2.fte, sc2.penaltyTime, sc2.totalTime, sc2.notes);
           } else {
             row.push(sc2.time, sc2.tnt, sc2.waitTime, sc2.waitTimeSec, sc2.notes);
           }
