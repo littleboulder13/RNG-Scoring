@@ -26,7 +26,7 @@
                 <img src="logo.png" alt="Stilly Run 'N Gun" class="event-logo">
                 <h1>Stilly Run 'N Gun</h1>
                 <p>Select an event to continue</p>
-                <span id="app-version" style="font-size:0.75rem;color:#ff0;background:#333;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px;">v128</span>
+                <span id="app-version" style="font-size:0.75rem;color:#ff0;background:#333;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px;">v129</span>
                 <div style="margin-top:10px;display:flex;gap:8px;justify-content:center;">
                     <button id="pull-events-btn" onclick="pullEvents()" style="font-size:0.85rem;padding:6px 14px;border:none;border-radius:6px;background:#1565c0;color:#fff;cursor:pointer;">⬇ Pull from Cloud</button>
                 </div>
@@ -107,15 +107,19 @@
                 </div>
                 <hr class="editor-divider">
                 <h4>Stages</h4>
-                <div class="add-competitor-form">
-                    <input type="text" id="edit-stage-name" placeholder="Stage name...">
-                    <select id="edit-stage-type" style="width:180px">
-                        <option value="standard_rng" selected>Standard RNG Stage</option>
-                        <option value="run_time">Run Time</option>
-                    </select>
-                    <input type="number" id="edit-stage-targets" placeholder="# targets" min="0" style="width:100px">
-                    <input type="number" id="edit-stage-par" placeholder="PAR (s)" min="0" step="0.01" style="width:100px">
-                    <button type="button" id="edit-add-stage-btn" class="btn-primary">Add</button>
+                <div class="add-stage-form">
+                    <div class="add-stage-row">
+                        <input type="text" id="edit-stage-name" placeholder="Stage name...">
+                        <select id="edit-stage-type">
+                            <option value="standard_rng" selected>Standard RNG Stage</option>
+                            <option value="run_time">Run Time</option>
+                        </select>
+                    </div>
+                    <div class="add-stage-row">
+                        <input type="number" id="edit-stage-targets" placeholder="# targets" min="0" style="width:100px">
+                        <input type="number" id="edit-stage-par" placeholder="PAR (s)" min="0" step="0.01" style="width:100px">
+                        <button type="button" id="edit-add-stage-btn" class="btn-primary">Add</button>
+                    </div>
                 </div>
                 <div id="edit-stages-list" class="edit-competitors-list">
                     <!-- Stage items rendered here -->
@@ -131,7 +135,7 @@
                 <div class="header-brand">
                     <img src="logo.png" alt="" class="header-logo">
                     <h1>Stilly RNG</h1>
-                    <span id="app-version-header" class="app-version-badge">v128</span>
+                    <span id="app-version-header" class="app-version-badge">v129</span>
                 </div>
                 <div id="active-event-bar" class="active-event-bar" style="display:none">
                     📋 <span id="active-event-name"></span>
