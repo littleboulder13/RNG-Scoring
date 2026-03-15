@@ -1,6 +1,6 @@
 /**
  * =============================================================
- * Stilly Run 'N Gun — Google Apps Script (v123)
+ * Stilly Run 'N Gun — Google Apps Script (v124)
  *
  * Each event gets its own Google Spreadsheet in a Drive folder.
  * The master spreadsheet stores event metadata (Events tab) and
@@ -609,6 +609,18 @@ function _pushEvent(ss, ev) {
     smCol = sheet.getLastColumn();
     sheet.getRange(1, smCol + 1).setValue('ScoringMethod');
     sheet.getRange(1, smCol + 1).setFontWeight('bold').setBackground('#1565c0').setFontColor('#ffffff');
+    hdrs = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  }
+
+  // Ensure EventType column exists
+  var etCol = -1;
+  for (var c3 = 0; c3 < hdrs.length; c3++) {
+    if (String(hdrs[c3]).toLowerCase().replace(/\s+/g, '') === 'eventtype') { etCol = c3; break; }
+  }
+  if (etCol === -1) {
+    etCol = sheet.getLastColumn();
+    sheet.getRange(1, etCol + 1).setValue('EventType');
+    sheet.getRange(1, etCol + 1).setFontWeight('bold').setBackground('#1565c0').setFontColor('#ffffff');
   }
 
   // Find existing row
@@ -641,8 +653,8 @@ function _pushEvent(ss, ev) {
     }
   }
 
-  // Build full row up to the last known column (smCol is furthest right)
-  var totalEvtCols = Math.max(ssIdCol, smCol) + 1;
+  // Build full row up to the last known column
+  var totalEvtCols = Math.max(ssIdCol, smCol, etCol) + 1;
   var row = new Array(totalEvtCols);
   row[0] = ev.id;
   row[1] = ev.name || '';
@@ -652,6 +664,7 @@ function _pushEvent(ss, ev) {
   row[5] = ev.password || '';
   row[ssIdCol] = existingSsId;
   row[smCol] = ev.scoringMethod || 'percentile_dnf0';
+  row[etCol] = ev.eventType || 'run_n_gun';
   // Fill any undefined slots
   for (var fi = 0; fi < row.length; fi++) { if (row[fi] === undefined) row[fi] = ''; }
 
@@ -701,6 +714,7 @@ function _pullEvents() {
     var pwCol     = colIdx['password'] !== undefined ? colIdx['password'] : 5;
     var ssIdCol   = colIdx['spreadsheetid'] !== undefined ? colIdx['spreadsheetid'] : -1;
     var smCol     = colIdx['scoringmethod'] !== undefined ? colIdx['scoringmethod'] : -1;
+    var etCol     = colIdx['eventtype'] !== undefined ? colIdx['eventtype'] : -1;
 
     return {
       id:            row[idCol],
@@ -709,7 +723,8 @@ function _pullEvents() {
       competitors:   safeParse(row[compCol], []),
       password:      row[pwCol] || '',
       spreadsheetId: ssIdCol >= 0 ? (row[ssIdCol] || '') : '',
-      scoringMethod: smCol >= 0 ? (row[smCol] || 'percentile_dnf0') : 'percentile_dnf0'
+      scoringMethod: smCol >= 0 ? (row[smCol] || 'percentile_dnf0') : 'percentile_dnf0',
+      eventType:     etCol >= 0 ? (row[etCol] || 'run_n_gun') : 'run_n_gun'
     };
   });
 
@@ -749,7 +764,7 @@ function _archiveEvent(ss, eventId) {
   var archiveSheet = ss.getSheetByName('ArchivedEvents');
   if (!archiveSheet) {
     archiveSheet = ss.insertSheet('ArchivedEvents');
-    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password', 'SpreadsheetId', 'ScoringMethod', 'ArchivedAt'];
+    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password', 'SpreadsheetId', 'ScoringMethod', 'EventType', 'ArchivedAt'];
     archiveSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     archiveSheet.getRange(1, 1, 1, headers.length)
       .setFontWeight('bold')
@@ -764,6 +779,12 @@ function _archiveEvent(ss, eventId) {
     if (String(hdrs[c2]).toLowerCase().replace(/\s+/g, '') === 'scoringmethod') { smCol = c2; break; }
   }
 
+  // Find EventType column
+  var etCol = -1;
+  for (var c3 = 0; c3 < hdrs.length; c3++) {
+    if (String(hdrs[c3]).toLowerCase().replace(/\s+/g, '') === 'eventtype') { etCol = c3; break; }
+  }
+
   var archiveRow = [
     rowData[0],                          // EventID
     rowData[1],                          // Name
@@ -773,6 +794,7 @@ function _archiveEvent(ss, eventId) {
     rowData[5],                          // Password
     ssIdCol >= 0 ? (rowData[ssIdCol] || '') : '',  // SpreadsheetId
     smCol >= 0 ? (rowData[smCol] || 'percentile_dnf0') : 'percentile_dnf0',  // ScoringMethod
+    etCol >= 0 ? (rowData[etCol] || 'run_n_gun') : 'run_n_gun',  // EventType
     new Date().toISOString()             // ArchivedAt
   ];
   archiveSheet.getRange(archiveSheet.getLastRow() + 1, 1, 1, archiveRow.length).setValues([archiveRow]);
@@ -814,7 +836,7 @@ function _restoreEvent(ss, eventId) {
   var sheet = ss.getSheetByName('Events') || ss.getSheetByName('_Events');
   if (!sheet) {
     sheet = ss.insertSheet('Events');
-    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password', 'SpreadsheetId', 'ScoringMethod'];
+    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password', 'SpreadsheetId', 'ScoringMethod', 'EventType'];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.getRange(1, 1, 1, headers.length)
       .setFontWeight('bold')
@@ -829,6 +851,12 @@ function _restoreEvent(ss, eventId) {
     if (String(archHdrs[c2]).toLowerCase().replace(/\s+/g, '') === 'scoringmethod') { archSmCol = c2; break; }
   }
 
+  // Find EventType column in archive
+  var archEtCol = -1;
+  for (var c3 = 0; c3 < archHdrs.length; c3++) {
+    if (String(archHdrs[c3]).toLowerCase().replace(/\s+/g, '') === 'eventtype') { archEtCol = c3; break; }
+  }
+
   var restoreRow = [
     rowData[0],                                           // EventID
     rowData[1],                                           // Name
@@ -837,7 +865,8 @@ function _restoreEvent(ss, eventId) {
     new Date().toISOString(),                             // Updated
     rowData[5],                                           // Password
     archSsIdCol >= 0 ? (rowData[archSsIdCol] || '') : '', // SpreadsheetId
-    archSmCol >= 0 ? (rowData[archSmCol] || 'percentile_dnf0') : 'percentile_dnf0'  // ScoringMethod
+    archSmCol >= 0 ? (rowData[archSmCol] || 'percentile_dnf0') : 'percentile_dnf0',  // ScoringMethod
+    archEtCol >= 0 ? (rowData[archEtCol] || 'run_n_gun') : 'run_n_gun'  // EventType
   ];
   sheet.getRange(sheet.getLastRow() + 1, 1, 1, restoreRow.length).setValues([restoreRow]);
   archiveSheet.deleteRow(rowIndex);
@@ -933,6 +962,11 @@ function _pullArchivedEvents() {
 
   var numCols = sheet.getLastColumn();
   var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, numCols).getValues();
+  var headers = sheet.getRange(1, 1, 1, numCols).getValues()[0];
+  var colIdx = {};
+  for (var c = 0; c < headers.length; c++) {
+    colIdx[String(headers[c]).toLowerCase().replace(/\s+/g, '')] = c;
+  }
 
   function safeParse(val, fallback) {
     if (!val || typeof val !== 'string') return fallback;
@@ -942,11 +976,17 @@ function _pullArchivedEvents() {
 
   return _jsonResponse({
     events: data.map(function(row) {
+      var smCol = colIdx['scoringmethod'] !== undefined ? colIdx['scoringmethod'] : -1;
+      var etCol = colIdx['eventtype'] !== undefined ? colIdx['eventtype'] : -1;
+      var pwCol = colIdx['password'] !== undefined ? colIdx['password'] : 5;
       return {
-        id:          row[0],
-        name:        row[1],
-        stages:      safeParse(row[2], []),
-        competitors: safeParse(row[3], [])
+        id:            row[0],
+        name:          row[1],
+        stages:        safeParse(row[2], []),
+        competitors:   safeParse(row[3], []),
+        password:      row[pwCol] || '',
+        scoringMethod: smCol >= 0 ? (row[smCol] || 'percentile_dnf0') : 'percentile_dnf0',
+        eventType:     etCol >= 0 ? (row[etCol] || 'run_n_gun') : 'run_n_gun'
       };
     })
   });

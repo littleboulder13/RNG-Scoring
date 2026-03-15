@@ -347,22 +347,25 @@ function renderEventOverlay() {
     if (!events.length) {
         cardsEl.innerHTML = '<div class="empty-state">No events yet. Create your first event below.</div>';
     } else {
-        cardsEl.innerHTML = events.map(e => `
+        cardsEl.innerHTML = events.map(e => {
+            const typeConfig = getEventTypeConfig(e.eventType || 'run_n_gun');
+            return `
             <div class="event-card">
                 <div class="event-card-info">
                     <h3>${e.password ? '🔒 ' : ''}${e.name}</h3>
                     <div class="event-card-meta">
-                        \uD83C\uDFAF ${e.stages.length} stage${e.stages.length !== 1 ? 's' : ''}
-                        &nbsp;·&nbsp; \uD83D\uDC65 ${e.competitors.length} shooter${e.competitors.length !== 1 ? 's' : ''}
+                        ${typeConfig.label}
+                        &nbsp;·&nbsp; 🎯 ${e.stages.length} stage${e.stages.length !== 1 ? 's' : ''}
+                        &nbsp;·&nbsp; 👥 ${e.competitors.length} shooter${e.competitors.length !== 1 ? 's' : ''}
                     </div>
                 </div>
                 <div class="event-card-actions">
                     <button class="btn-edit-event admin-only" data-id="${e.id}">✎ Edit</button>
                     <button class="btn-select-event" data-id="${e.id}">Select</button>
-                    <button class="btn-delete-event admin-only" data-id="${e.id}">\u2715</button>
+                    <button class="btn-delete-event admin-only" data-id="${e.id}">✕</button>
                 </div>
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
     }
 
     // Archived (old) events — admin only
@@ -426,7 +429,9 @@ function openEventEditor(eventId) {
     $('event-editor-title').textContent = `Edit: ${ev.name}`;
     $('edit-event-name').value = ev.name;
     $('edit-event-password').value = ev.password || '';
+    $('edit-event-type').value = ev.eventType || 'run_n_gun';
     $('edit-event-scoring').value = ev.scoringMethod || 'percentile_dnf0';
+    updateStageTypeDropdowns();
     renderEditCompetitorsList();
     renderEditStagesList();
 
@@ -449,8 +454,36 @@ function saveEventEditorFields() {
     const name = $('edit-event-name').value.trim();
     if (!name) return;
     const password = ($('edit-event-password').value || '').trim();
+    const eventType = $('edit-event-type').value || 'run_n_gun';
     const scoringMethod = $('edit-event-scoring').value || 'percentile_dnf0';
-    updateEvent(editingEventId, { name, password, scoringMethod });
+    updateEvent(editingEventId, { name, password, eventType, scoringMethod });
+}
+
+/** Update the 'Add Stage' type dropdown based on the current event type */
+function updateStageTypeDropdowns() {
+    const ev = editingEventId ? getEventById(editingEventId) : null;
+    const eventType = ev ? (ev.eventType || 'run_n_gun') : ($('edit-event-type')?.value || 'run_n_gun');
+    const config = getEventTypeConfig(eventType);
+    const allowed = config.stageTypes;
+
+    const STAGE_TYPE_OPTIONS = {
+        'standard_rng': 'Standard RNG Stage',
+        'run_time':     'Run Time'
+    };
+
+    // Update the "Add Stage" dropdown
+    const sel = $('edit-stage-type');
+    if (sel) {
+        const prev = sel.value;
+        sel.innerHTML = allowed.map(t =>
+            `<option value="${t}">${STAGE_TYPE_OPTIONS[t] || t}</option>`
+        ).join('');
+        sel.value = allowed.includes(prev) ? prev : allowed[0];
+        // Show/hide targets & par fields
+        const isRT = sel.value === 'run_time';
+        $('edit-stage-targets').style.display = isRT ? 'none' : '';
+        $('edit-stage-par').style.display     = isRT ? 'none' : '';
+    }
 }
 
 function renderEditCompetitorsList() {
@@ -502,6 +535,8 @@ function renderEditStagesList() {
     }
 
     var STAGE_TYPE_LABELS = { 'standard_rng': 'Standard RNG Stage', 'run_time': 'Run Time' };
+    const evType = ev.eventType || 'run_n_gun';
+    const allowedTypes = getEventTypeConfig(evType).stageTypes;
     el.innerHTML = ev.stages.map(s => {
         const typeLabel = STAGE_TYPE_LABELS[s.type || 'standard_rng'] || s.type || 'Standard RNG Stage';
         const meta = [
@@ -509,6 +544,9 @@ function renderEditStagesList() {
             s.targets ? `${s.targets} targets` : '',
             s.par     ? `PAR: ${s.par}s`        : ''
         ].filter(Boolean).join(' · ');
+        const typeOptions = allowedTypes.map(t =>
+            `<option value="${t}"${(s.type || 'standard_rng') === t ? ' selected' : ''}>${STAGE_TYPE_LABELS[t] || t}</option>`
+        ).join('');
         return `
         <div class="competitor-item" data-stage-name="${s.name}">
             <div class="stage-view">
@@ -523,8 +561,7 @@ function renderEditStagesList() {
             <div class="stage-edit" style="display:none">
                 <input type="text" class="edit-name" value="${s.name}" placeholder="Stage name">
                 <select class="edit-type" style="width:180px">
-                    <option value="standard_rng"${(s.type || 'standard_rng') === 'standard_rng' ? ' selected' : ''}>Standard RNG Stage</option>
-                    <option value="run_time"${s.type === 'run_time' ? ' selected' : ''}>Run Time</option>
+                    ${typeOptions}
                 </select>
                 <input type="number" class="edit-targets" value="${s.targets}" placeholder="# targets" min="0" style="width:100px${(s.type || 'standard_rng') === 'run_time' ? ';display:none' : ''}">
                 <input type="number" class="edit-par" value="${s.par}" placeholder="PAR (s)" min="0" step="0.01" style="width:100px${(s.type || 'standard_rng') === 'run_time' ? ';display:none' : ''}">

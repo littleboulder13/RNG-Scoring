@@ -390,7 +390,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const name = $('new-event-name').value.trim();
         if (!name) { alert('Please enter an event name.'); return; }
         const scoringMethod = $('new-event-scoring').value;
-        const event = createEvent(name, scoringMethod);
+        const eventType = $('new-event-type').value;
+        const event = createEvent(name, scoringMethod, eventType);
         pushEventConfig(event.id);
         $('new-event-name').value = '';
         renderEventOverlay();
@@ -463,6 +464,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (wasEditingId === getActiveEventId()) {
             refreshAfterEventChange();
         }
+    });
+    // --- Event Editor: event type change → update stage type dropdown ---
+    $('edit-event-type').addEventListener('change', () => {
+        saveEventEditorFields();   // persist the new eventType
+        updateStageTypeDropdowns(); // refresh Add Stage dropdown options
+        renderEditStagesList();     // refresh inline-edit dropdowns
     });
     $('edit-add-competitor-btn').addEventListener('click', () => {
         const name = $('edit-competitor-name').value.trim();

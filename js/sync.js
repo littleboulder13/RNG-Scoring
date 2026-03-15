@@ -1,7 +1,7 @@
 /* =============================================================
    Network Sync — Google Sheets via Apps Script
    ============================================================= */
-const APP_VERSION = 'v123';
+const APP_VERSION = 'v124';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxDwug8yxfGbuqVKWUb7WTZh89NJQzp5ZaIIC3aPs4w4iiWogk0Yvg7M9ASgy70NOkW/exec';
 
 function getSyncUrl() {
@@ -219,6 +219,9 @@ async function pullEvents() {
                     local[idx].name = remote.name;
                     local[idx].stages = remote.stages;
                     local[idx].competitors = remote.competitors;
+                    if (remote.password !== undefined)      local[idx].password      = remote.password;
+                    if (remote.scoringMethod !== undefined)  local[idx].scoringMethod  = remote.scoringMethod;
+                    if (remote.eventType !== undefined)      local[idx].eventType      = remote.eventType;
                     updated++;
                 }
             }

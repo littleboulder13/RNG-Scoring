@@ -1,9 +1,20 @@
 /* =============================================================
    Event Management (localStorage)
    
-   Each event: { id, name, pin, stages[], competitors[] }
+   Each event: { id, name, eventType, pin, stages[], competitors[] }
    Stages and competitors are stored per-event, not globally.
    ============================================================= */
+
+/* --- Event Type Configuration --- */
+const EVENT_TYPE_CONFIG = {
+    run_n_gun:    { label: "Run N' Gun",    stageTypes: ['standard_rng', 'run_time'], defaultStages: [{ name: 'Run Time', type: 'run_time', targets: '', par: '' }] },
+    two_gun:      { label: 'Two Gun',       stageTypes: ['standard_rng'],             defaultStages: [] },
+    pistol_match: { label: 'Pistol Match',  stageTypes: ['standard_rng'],             defaultStages: [] }
+};
+
+function getEventTypeConfig(eventType) {
+    return EVENT_TYPE_CONFIG[eventType] || EVENT_TYPE_CONFIG['run_n_gun'];
+}
 
 /* --- Global Admin PIN --- */
 function getAdminPin() {
@@ -49,15 +60,16 @@ function saveEvents(list) {
     localStorage.setItem('rng_events', JSON.stringify(list));
 }
 
-function createEvent(name, scoringMethod) {
+function createEvent(name, scoringMethod, eventType) {
     const events = getEvents();
+    const type = eventType || 'run_n_gun';
+    const config = getEventTypeConfig(type);
     const event = {
         id:          Date.now().toString(36) + Math.random().toString(36).substr(2, 6),
         name,
+        eventType:     type,
         scoringMethod: scoringMethod || 'percentile_dnf0',
-        stages:      [
-            { name: 'Run Time', type: 'run_time', targets: '', par: '' }
-        ],
+        stages:        config.defaultStages.map(s => ({ ...s })),
         competitors: []
     };
     events.push(event);
