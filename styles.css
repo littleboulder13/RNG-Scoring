@@ -597,7 +597,47 @@ button {
 .stage-view {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
+}
+
+.stage-info-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+.stage-meta-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.stage-type-tag {
+    background: #e3f2fd;
+    color: #1565c0;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.1rem 0.5rem;
+    border-radius: 10px;
+}
+
+.stage-targets-tag {
+    background: #fff3e0;
+    color: #e65100;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.1rem 0.5rem;
+    border-radius: 10px;
+}
+
+.stage-par-tag {
+    background: #f3e5f5;
+    color: #7b1fa2;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.1rem 0.5rem;
+    border-radius: 10px;
 }
 
 .competitor-name {

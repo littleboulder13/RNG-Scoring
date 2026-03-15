@@ -564,20 +564,20 @@ function renderEditStagesList() {
     const allowedTypes = getEventTypeConfig(evType).stageTypes;
     el.innerHTML = ev.stages.map(s => {
         const typeLabel = STAGE_TYPE_LABELS[s.type || 'standard_rng'] || s.type || 'Standard RNG Stage';
-        const meta = [
-            typeLabel,
-            s.targets ? `${s.targets} targets` : '',
-            s.par     ? `PAR: ${s.par}s`        : ''
-        ].filter(Boolean).join(' · ');
         const typeOptions = allowedTypes.map(t =>
             `<option value="${t}"${(s.type || 'standard_rng') === t ? ' selected' : ''}>${STAGE_TYPE_LABELS[t] || t}</option>`
         ).join('');
         return `
         <div class="competitor-item" data-stage-name="${s.name}">
             <div class="stage-view">
-                <span class="competitor-name">
-                    ${s.name}${meta ? ` <em style="color:#888;font-size:0.85em">(${meta})</em>` : ''}
-                </span>
+                <div class="stage-info-block">
+                    <span class="competitor-name">${s.name}</span>
+                    <div class="stage-meta-tags">
+                        <span class="stage-type-tag">${typeLabel}</span>
+                        ${s.targets ? `<span class="stage-targets-tag">${s.targets} targets</span>` : ''}
+                        ${s.par ? `<span class="stage-par-tag">PAR: ${s.par}s</span>` : ''}
+                    </div>
+                </div>
                 <div class="item-actions">
                     <button class="btn-edit" data-name="${s.name}">Edit</button>
                     <button class="btn-delete" data-name="${s.name}">Remove</button>
