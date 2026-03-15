@@ -8,8 +8,8 @@
 /* --- Event Type Configuration --- */
 const EVENT_TYPE_CONFIG = {
     run_n_gun:    { label: "Run N' Gun",    stageTypes: ['standard_rng', 'run_time'], defaultStages: [{ name: 'Run Time', type: 'run_time', targets: '', par: '' }] },
-    two_gun:      { label: 'Two Gun',       stageTypes: ['standard_rng', 'hit_factor'],             defaultStages: [] },
-    pistol_match: { label: 'Pistol Match',  stageTypes: ['standard_rng', 'hit_factor'],             defaultStages: [] }
+    two_gun:      { label: 'Two Gun',       stageTypes: ['standard_rng', 'hit_factor', 'time_plus'], defaultStages: [] },
+    pistol_match: { label: 'Pistol Match',  stageTypes: ['standard_rng', 'hit_factor', 'time_plus'], defaultStages: [] }
 };
 
 function getEventTypeConfig(eventType) {

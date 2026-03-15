@@ -528,14 +528,15 @@ document.addEventListener('DOMContentLoaded', () => {
     $('edit-stage-type').addEventListener('change', () => {
         const isRunTime = $('edit-stage-type').value === 'run_time';
         const isHF = $('edit-stage-type').value === 'hit_factor';
+        const isTP = $('edit-stage-type').value === 'time_plus';
         $('edit-stage-targets').style.display = isRunTime ? 'none' : '';
-        $('edit-stage-par').style.display     = (isRunTime || isHF) ? 'none' : '';
+        $('edit-stage-par').style.display     = (isRunTime || isHF || isTP) ? 'none' : '';
         if (isRunTime) {
             $('edit-stage-targets').value = '';
             $('edit-stage-par').value = '';
             if (!$('edit-stage-name').value.trim()) $('edit-stage-name').value = 'Run Time';
         }
-        if (isHF) {
+        if (isHF || isTP) {
             $('edit-stage-par').value = '';
         }
     });
@@ -742,6 +743,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 ['Hit Factor', score.hitFactor],
                 ['Notes', score.notes || '—']
             ];
+        } else if (score.stageType === 'time_plus') {
+            rows = [
+                ['Stage', score.stage],
+                ['Shooter', score.playerName],
+                ['Division', score.division || '—'],
+                ['Time (s)', score.time],
+                ['Down 1', score.down1 || 0],
+                ['Down 3', score.down3 || 0],
+                ['Misses', score.misses || 0],
+                ['Procedurals', score.procedurals || 0],
+                ['FTN', score.ftn || 0],
+                ['Penalty Time', '+' + score.penaltyTime + 's'],
+                ['Total Time', score.totalTime + 's'],
+                ['Notes', score.notes || '—']
+            ];
         } else {
             rows = [
                 ['Stage', score.stage],
@@ -925,6 +941,63 @@ document.addEventListener('DOMContentLoaded', () => {
                 fte,
                 totalPoints,
                 hitFactor:    Math.round(hitFactor * 10000) / 10000,
+                waitTime:     0,
+                targetsNotNeutralized: 0,
+                dnf:          false,
+                notes:        $('notes').value
+            };
+
+            showConfirmScoreModal(score);
+            return;
+        }
+
+        // --- Time Plus stage validation ---
+        if (stageType === 'time_plus') {
+            const tpTime = parseFloat($('tp-time').value);
+            if (isNaN(tpTime) || tpTime <= 0) {
+                const err = $('form-error');
+                err.textContent = 'Enter a valid time.';
+                err.style.display = 'block';
+                return;
+            }
+
+            const down1       = parseInt($('tp-down1').value) || 0;
+            const down3       = parseInt($('tp-down3').value) || 0;
+            const misses      = parseInt($('tp-misses').value) || 0;
+            const procedurals = parseInt($('tp-procedurals').value) || 0;
+            const ftn         = parseInt($('tp-ftn').value) || 0;
+
+            // IDPA: Down1=+1s, Down3=+3s, Miss=+5s, Procedural=+3s, FTN=+5s
+            const penaltyTime = (down1 * 1) + (down3 * 3) + (misses * 5) + (procedurals * 3) + (ftn * 5);
+            const totalTime = Math.round((tpTime + penaltyTime) * 100) / 100;
+
+            $('form-error').style.display = 'none';
+
+            const playerName = $('player-name').value;
+            await dbReady;
+            const existing = await getEventScores();
+            const isDuplicate = existing.some(s => s.playerName === playerName && s.stage === stageName);
+            if (isDuplicate) {
+                const confirmed = confirm(
+                    `A score for "${playerName}" on "${stageName}" has already been recorded.\n\nAre you sure you want to add another entry?`
+                );
+                if (!confirmed) return;
+            }
+
+            const score = {
+                eventId:      getActiveEventId(),
+                stage:        stageName,
+                stageType:    'time_plus',
+                playerName,
+                division:     getPlayerDivision($('player-name').value),
+                time:         tpTime,
+                down1,
+                down3,
+                misses,
+                procedurals,
+                ftn,
+                penaltyTime,
+                totalTime,
                 waitTime:     0,
                 targetsNotNeutralized: 0,
                 dnf:          false,
