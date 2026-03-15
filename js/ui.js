@@ -266,7 +266,7 @@ function toggleStageTypeFields() {
     // Clear hidden fields when switching
     if (isRunTime) {
         if ($('time')) $('time').value = '';
-        if ($('targets-not-neutralized')) $('targets-not-neutralized').value = '0';
+        if ($('targets-not-neutralized')) $('targets-not-neutralized').value = '';
         if ($('dnf')) $('dnf').checked = false;
     } else {
         if ($('run-start-time'))  $('run-start-time').value  = '';
