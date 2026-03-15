@@ -1,6 +1,6 @@
 /**
  * =============================================================
- * Stilly Run 'N Gun — Google Apps Script (v136)
+ * Stilly Run 'N Gun — Google Apps Script (v137)
  *
  * Each event gets its own Google Spreadsheet in a Drive folder.
  * The master spreadsheet stores event metadata (Events tab) and
@@ -500,7 +500,8 @@ function _syncScores(ss, data) {
 var SCORING_METHODS = {
   'percentile_dnf0': 'Percentile Scoring, DNF=0',
   'hit_factor': 'Percentile',
-  'spread_dnf_neg25': 'Spread Scoring, DNF=-25'
+  'spread_dnf_neg25': 'Spread Scoring, DNF=-25',
+  'normalized_percentile': 'Normalized Percentile Scoring'
 };
 
 function _buildResultsTabs(eventSS, stageNames, allScores, competitors, scoringMethod, stages) {
@@ -533,7 +534,7 @@ function _buildResultsTabs(eventSS, stageNames, allScores, competitors, scoringM
     var shooters = divisionShooters[div];
     var tabName = ('Results \u2014 ' + div).substring(0, 100);
 
-    // Build stage info lookup (targets, type) from stages array
+    // Build stage info lookup (targets, type, par) from stages array
     var stageInfo = {};
     if (stages) {
       for (var sti = 0; sti < stages.length; sti++) {
@@ -541,7 +542,8 @@ function _buildResultsTabs(eventSS, stageNames, allScores, competitors, scoringM
         var stNm = stObj2.name || stObj2;
         stageInfo[stNm] = {
           type: stObj2.type || 'standard_rng',
-          targets: parseInt(stObj2.targets, 10) || 0
+          targets: parseInt(stObj2.targets, 10) || 0,
+          par: parseFloat(stObj2.par) || 0
         };
       }
     }
@@ -701,6 +703,92 @@ function _buildResultsTabs(eventSS, stageNames, allScores, competitors, scoringM
           results[ps2].stageResults.push(pts2);
           results[ps2].total += pts2;
         }
+      }
+
+    } else if (scoringMethod === 'normalized_percentile') {
+      // Normalized Percentile: 0 pts at par time, 100 pts for fastest, negative below par
+      // DNF = -(TNT / totalTargets) × 25
+      // Stages without par or non-standard types fall back to regular percentile
+      var npFastestPerStage = {};
+      for (var s1n = 0; s1n < stageNames.length; s1n++) {
+        var stgNn = stageNames[s1n];
+        var infN = stageInfo[stgNn] || {};
+        if (infN.type === 'time_plus') {
+          // Best (lowest) totalTime
+          var bestTpN = Infinity;
+          for (var p1n = 0; p1n < shooters.length; p1n++) {
+            var scN = allScores[stgNn] && allScores[stgNn][shooters[p1n]];
+            if (scN && scN.totalTime > 0 && scN.totalTime < bestTpN) bestTpN = scN.totalTime;
+          }
+          npFastestPerStage[stgNn] = bestTpN === Infinity ? 0 : bestTpN;
+        } else if (infN.type === 'hit_factor') {
+          // Best (highest) hitFactor
+          var bestHfN = 0;
+          for (var p1n2 = 0; p1n2 < shooters.length; p1n2++) {
+            var scN2 = allScores[stgNn] && allScores[stgNn][shooters[p1n2]];
+            if (scN2 && scN2.hitFactor > bestHfN) bestHfN = scN2.hitFactor;
+          }
+          npFastestPerStage[stgNn] = bestHfN;
+        } else {
+          // Standard_rng / run_time: fastest (lowest) time
+          var fastN = Infinity;
+          for (var p1n3 = 0; p1n3 < shooters.length; p1n3++) {
+            var scN3 = allScores[stgNn] && allScores[stgNn][shooters[p1n3]];
+            if (scN3 && scN3.time !== 'DNF' && typeof scN3.time === 'number' && scN3.time > 0 && scN3.time < fastN) {
+              fastN = scN3.time;
+            }
+          }
+          npFastestPerStage[stgNn] = fastN === Infinity ? 0 : fastN;
+        }
+      }
+
+      for (var p2n = 0; p2n < shooters.length; p2n++) {
+        var playerN = shooters[p2n];
+        var stageResultsN = [];
+        var totalPtsN = 0;
+        for (var s2n = 0; s2n < stageNames.length; s2n++) {
+          var ptsN = 0;
+          var stgN2 = stageNames[s2n];
+          var infN2 = stageInfo[stgN2] || {};
+          var entryN = allScores[stgN2] && allScores[stgN2][playerN];
+          var fastestN = npFastestPerStage[stgN2];
+
+          if (infN2.type === 'time_plus') {
+            // time_plus: percentile = best totalTime / shooter totalTime × 100
+            if (entryN && entryN.totalTime > 0 && fastestN > 0) {
+              ptsN = (fastestN / entryN.totalTime) * 100;
+            }
+          } else if (infN2.type === 'hit_factor') {
+            // hit_factor: percentile = shooter HF / best HF × 100
+            if (entryN && entryN.hitFactor > 0 && fastestN > 0) {
+              ptsN = (entryN.hitFactor / fastestN) * 100;
+            }
+          } else if (entryN) {
+            // standard_rng / run_time
+            var parN = infN2.par || 0;
+            if (entryN.time === 'DNF') {
+              // DNF: -(TNT / totalTargets) × 25
+              var tgtN = infN2.targets || 0;
+              var tntN = entryN.tnt || 0;
+              if (tgtN > 0) {
+                ptsN = -(tntN / tgtN) * 25;
+              } else {
+                ptsN = -25; // No target info, full penalty
+              }
+            } else if (typeof entryN.time === 'number' && entryN.time > 0 && fastestN > 0) {
+              if (parN > 0 && parN > fastestN) {
+                // Normalized: par = 0 pts, fastest = 100 pts
+                ptsN = ((parN - entryN.time) / (parN - fastestN)) * 100;
+              } else {
+                // No par or par <= fastest: fall back to regular percentile
+                ptsN = (fastestN / entryN.time) * 100;
+              }
+            }
+          }
+          stageResultsN.push(ptsN);
+          totalPtsN += ptsN;
+        }
+        results.push({ name: playerN, stageResults: stageResultsN, stageRanks: [], total: totalPtsN });
       }
 
     } else {
