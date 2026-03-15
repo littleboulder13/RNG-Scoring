@@ -26,7 +26,7 @@
                 <img src="logo.png" alt="Stilly Run 'N Gun" class="event-logo">
                 <h1>Stilly Run 'N Gun</h1>
                 <p>Select an event to continue</p>
-                <span id="app-version" style="font-size:0.75rem;color:#ff0;background:#333;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px;">v126</span>
+                <span id="app-version" style="font-size:0.75rem;color:#ff0;background:#333;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px;">v127</span>
                 <div style="margin-top:10px;display:flex;gap:8px;justify-content:center;">
                     <button id="pull-events-btn" onclick="pullEvents()" style="font-size:0.85rem;padding:6px 14px;border:none;border-radius:6px;background:#1565c0;color:#fff;cursor:pointer;">⬇ Pull from Cloud</button>
                 </div>
@@ -131,7 +131,7 @@
                 <div class="header-brand">
                     <img src="logo.png" alt="" class="header-logo">
                     <h1>Stilly RNG</h1>
-                    <span id="app-version-header" class="app-version-badge">v126</span>
+                    <span id="app-version-header" class="app-version-badge">v127</span>
                 </div>
                 <div id="active-event-bar" class="active-event-bar" style="display:none">
                     📋 <span id="active-event-name"></span>
@@ -218,6 +218,32 @@
                             <div class="hms-input-row">
                                 <input type="text" id="run-finish-time" class="hms-input" inputmode="numeric" placeholder="HH:MM:SS" autocomplete="off">
                                 <button type="button" id="finish-now-btn" class="btn-now" title="Use current time">Now</button>
+                            </div>
+                        </div>
+                        <div id="hf-time-row" class="form-group" style="display:none">
+                            <label for="hf-time">Time (seconds)</label>
+                            <input type="number" id="hf-time" step="0.01" min="0" placeholder="0.00">
+                        </div>
+                        <div id="hf-fields" style="display:none">
+                            <div class="form-group">
+                                <label for="hf-charlies">Charlies (C) <span class="time-format-hint">3 pts</span></label>
+                                <input type="number" id="hf-charlies" min="0" placeholder="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="hf-deltas">Deltas (D) <span class="time-format-hint">1 pt</span></label>
+                                <input type="number" id="hf-deltas" min="0" placeholder="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="hf-mikes">Mikes (M) <span class="time-format-hint">−10 penalty</span></label>
+                                <input type="number" id="hf-mikes" min="0" placeholder="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="hf-procedurals">Procedurals <span class="time-format-hint">−10 penalty</span></label>
+                                <input type="number" id="hf-procedurals" min="0" placeholder="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="hf-fte">FTE <span class="time-format-hint">−10 penalty</span></label>
+                                <input type="number" id="hf-fte" min="0" placeholder="0">
                             </div>
                         </div>
                         <div class="form-group">

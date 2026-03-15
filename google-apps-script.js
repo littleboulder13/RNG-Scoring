@@ -1,6 +1,6 @@
 /**
  * =============================================================
- * Stilly Run 'N Gun — Google Apps Script (v126)
+ * Stilly Run 'N Gun — Google Apps Script (v127)
  *
  * Each event gets its own Google Spreadsheet in a Drive folder.
  * The master spreadsheet stores event metadata (Events tab) and
@@ -214,6 +214,8 @@ function _syncScores(ss, data) {
   var STD_SCORE_COLS = STD_SCORE_HEADERS.length;
   var RT_SCORE_HEADERS = ['Start Time (H:MM:SS)', 'Start Time (s)', 'Finish Time (H:MM:SS)', 'Finish Time (s)', 'Run Time (s)', 'Notes'];
   var RT_SCORE_COLS = RT_SCORE_HEADERS.length;
+  var HF_SCORE_HEADERS = ['Time (s)', 'Charlies', 'Deltas', 'Mikes', 'Procedurals', 'FTE', 'Total Points', 'Hit Factor', 'Notes'];
+  var HF_SCORE_COLS = HF_SCORE_HEADERS.length;
 
   // Build stage name → type lookup
   var stageTypeMap = {};
@@ -260,8 +262,9 @@ function _syncScores(ss, data) {
   for (var si2 = 0; si2 < stageNames.length; si2++) {
     var stage = stageNames[si2];
     var isRunTime = (stageTypeMap[stage] === 'run_time');
-    var SCORE_HEADERS = isRunTime ? RT_SCORE_HEADERS : STD_SCORE_HEADERS;
-    var SCORE_COLS = isRunTime ? RT_SCORE_COLS : STD_SCORE_COLS;
+    var isHitFactor = (stageTypeMap[stage] === 'hit_factor');
+    var SCORE_HEADERS = isRunTime ? RT_SCORE_HEADERS : (isHitFactor ? HF_SCORE_HEADERS : STD_SCORE_HEADERS);
+    var SCORE_COLS = isRunTime ? RT_SCORE_COLS : (isHitFactor ? HF_SCORE_COLS : STD_SCORE_COLS);
     // Tab name: just the stage name (no event prefix — it's already its own spreadsheet)
     var tabName = stage.substring(0, 100);
 
@@ -296,6 +299,18 @@ function _syncScores(ss, data) {
               runTime: existData[ex][off + 4] || 0,
               notes: existData[ex][off + 5] || ''
             });
+          } else if (isHitFactor) {
+            exScores.push({
+              time: firstVal,
+              charlies: existData[ex][off + 1] || 0,
+              deltas: existData[ex][off + 2] || 0,
+              mikes: existData[ex][off + 3] || 0,
+              procedurals: existData[ex][off + 4] || 0,
+              fte: existData[ex][off + 5] || 0,
+              totalPoints: existData[ex][off + 6] || 0,
+              hitFactor: existData[ex][off + 7] || 0,
+              notes: existData[ex][off + 8] || ''
+            });
           } else {
             exScores.push({
               time: firstVal,
@@ -325,6 +340,18 @@ function _syncScores(ss, data) {
           runTime: sc.time || 0,
           notes: sc.notes || ''
         };
+      } else if (isHitFactor) {
+        newScore = {
+          time: sc.time || 0,
+          charlies: sc.charlies || 0,
+          deltas: sc.deltas || 0,
+          mikes: sc.mikes || 0,
+          procedurals: sc.procedurals || 0,
+          fte: sc.fte || 0,
+          totalPoints: sc.totalPoints || 0,
+          hitFactor: sc.hitFactor || 0,
+          notes: sc.notes || ''
+        };
       } else {
         newScore = {
           time: sc.dnf ? 'DNF' : (sc.time || 0),
@@ -348,7 +375,8 @@ function _syncScores(ss, data) {
         var latest = emEntry.scores[emEntry.scores.length - 1];
         var latestTime = isRunTime ? latest.runTime : latest.time;
         var latestTnt = isRunTime ? 0 : (latest.tnt || 0);
-        allScores[stage][emKey] = { time: latestTime, division: emEntry.division, tnt: latestTnt };
+        var latestHitFactor = isHitFactor ? (latest.hitFactor || 0) : 0;
+        allScores[stage][emKey] = { time: latestTime, division: emEntry.division, tnt: latestTnt, hitFactor: latestHitFactor };
       }
     }
 
@@ -393,6 +421,8 @@ function _syncScores(ss, data) {
           var sc2 = entry.scores[sb];
           if (isRunTime) {
             row.push(sc2.startTimeFmt, sc2.startTimeSec, sc2.finishTimeFmt, sc2.finishTimeSec, sc2.runTime, sc2.notes);
+          } else if (isHitFactor) {
+            row.push(sc2.time, sc2.charlies, sc2.deltas, sc2.mikes, sc2.procedurals, sc2.fte, sc2.totalPoints, sc2.hitFactor, sc2.notes);
           } else {
             row.push(sc2.time, sc2.tnt, sc2.waitTime, sc2.waitTimeSec, sc2.notes);
           }
@@ -486,20 +516,23 @@ function _buildResultsTabs(eventSS, stageNames, allScores, competitors, scoringM
     var results = [];
 
     if (scoringMethod === 'hit_factor') {
-      // Hit Factor: HF = (targets − TNT) / time
+      // Hit Factor scoring:
+      // For hit_factor stage type: use pre-computed hitFactor from score
+      // For standard_rng: HF = (targets − TNT) / time
+      // For run-time or targetless: falls back to 1/time
       // Stage % = (shooter HF / best HF in division) × 100
-      // For run-time or targetless stages, falls back to 1/time
       var bestHfPerStage = {};
       for (var s1 = 0; s1 < stageNames.length; s1++) {
         var stgName = stageNames[s1];
         var inf = stageInfo[stgName] || {};
-        var isRT = inf.type === 'run_time';
         var bestHf = 0;
         for (var p1 = 0; p1 < shooters.length; p1++) {
           var sc = allScores[stgName] && allScores[stgName][shooters[p1]];
           if (!sc || sc.time === 'DNF' || typeof sc.time !== 'number' || sc.time <= 0) continue;
           var hf;
-          if (isRT || inf.targets <= 0) {
+          if (inf.type === 'hit_factor') {
+            hf = sc.hitFactor || 0;
+          } else if (inf.type === 'run_time' || inf.targets <= 0) {
             hf = 1 / sc.time;
           } else {
             var pts = inf.targets - (sc.tnt || 0);
@@ -518,11 +551,12 @@ function _buildResultsTabs(eventSS, stageNames, allScores, competitors, scoringM
           var pct = 0;
           var stgN = stageNames[s2];
           var inf2 = stageInfo[stgN] || {};
-          var isRT2 = inf2.type === 'run_time';
           var entry = allScores[stgN] && allScores[stgN][player];
           if (entry && entry.time !== 'DNF' && typeof entry.time === 'number' && entry.time > 0) {
             var shooterHf;
-            if (isRT2 || inf2.targets <= 0) {
+            if (inf2.type === 'hit_factor') {
+              shooterHf = entry.hitFactor || 0;
+            } else if (inf2.type === 'run_time' || inf2.targets <= 0) {
               shooterHf = 1 / entry.time;
             } else {
               var shooterPts = inf2.targets - (entry.tnt || 0);

@@ -236,7 +236,8 @@ function getSelectedStageType() {
 function toggleStageTypeFields() {
     const stageType = getSelectedStageType();
     const isRunTime = stageType === 'run_time';
-    const isStandard = !isRunTime;
+    const isHitFactor = stageType === 'hit_factor';
+    const isStandard = !isRunTime && !isHitFactor;
     const dnf = $('dnf').checked;
 
     // Standard RNG fields
@@ -245,10 +246,15 @@ function toggleStageTypeFields() {
     if ($('tnt-row'))    $('tnt-row').style.display     = isStandard && dnf ? '' : 'none';
     if ($('time'))       $('time').required = isStandard && !dnf;
 
-    // Wait time — hidden for Run Time
+    // Hit Factor fields
+    if ($('hf-time-row')) $('hf-time-row').style.display = isHitFactor ? '' : 'none';
+    if ($('hf-fields'))   $('hf-fields').style.display   = isHitFactor ? '' : 'none';
+    if ($('hf-time'))     $('hf-time').required = isHitFactor;
+
+    // Wait time — hidden for Run Time and Hit Factor
     const waitTimeRow = document.querySelector('.form-group:has(#wait-time)');
-    if (waitTimeRow) waitTimeRow.style.display = isRunTime ? 'none' : '';
-    if (isRunTime) {
+    if (waitTimeRow) waitTimeRow.style.display = (isRunTime || isHitFactor) ? 'none' : '';
+    if (isRunTime || isHitFactor) {
         if ($('wait-time')) $('wait-time').value = '';
     }
 
@@ -268,10 +274,27 @@ function toggleStageTypeFields() {
         if ($('time')) $('time').value = '';
         if ($('targets-not-neutralized')) $('targets-not-neutralized').value = '';
         if ($('dnf')) $('dnf').checked = false;
+        clearHitFactorFields();
+    } else if (isHitFactor) {
+        if ($('time')) $('time').value = '';
+        if ($('targets-not-neutralized')) $('targets-not-neutralized').value = '';
+        if ($('dnf')) $('dnf').checked = false;
+        if ($('run-start-time'))  $('run-start-time').value  = '';
+        if ($('run-finish-time')) $('run-finish-time').value = '';
     } else {
         if ($('run-start-time'))  $('run-start-time').value  = '';
         if ($('run-finish-time')) $('run-finish-time').value = '';
+        clearHitFactorFields();
     }
+}
+
+function clearHitFactorFields() {
+    if ($('hf-time'))        $('hf-time').value = '';
+    if ($('hf-charlies'))    $('hf-charlies').value = '';
+    if ($('hf-deltas'))      $('hf-deltas').value = '';
+    if ($('hf-mikes'))       $('hf-mikes').value = '';
+    if ($('hf-procedurals')) $('hf-procedurals').value = '';
+    if ($('hf-fte'))         $('hf-fte').value = '';
 }
 
 // --- Scores Display ---
@@ -468,7 +491,8 @@ function updateStageTypeDropdowns() {
 
     const STAGE_TYPE_OPTIONS = {
         'standard_rng': 'Standard RNG Stage',
-        'run_time':     'Run Time'
+        'run_time':     'Run Time',
+        'hit_factor':   'Hit Factor'
     };
 
     // Update the "Add Stage" dropdown
@@ -481,8 +505,9 @@ function updateStageTypeDropdowns() {
         sel.value = allowed.includes(prev) ? prev : allowed[0];
         // Show/hide targets & par fields
         const isRT = sel.value === 'run_time';
+        const isHF = sel.value === 'hit_factor';
         $('edit-stage-targets').style.display = isRT ? 'none' : '';
-        $('edit-stage-par').style.display     = isRT ? 'none' : '';
+        $('edit-stage-par').style.display     = (isRT || isHF) ? 'none' : '';
     }
 }
 
@@ -534,7 +559,7 @@ function renderEditStagesList() {
         return;
     }
 
-    var STAGE_TYPE_LABELS = { 'standard_rng': 'Standard RNG Stage', 'run_time': 'Run Time' };
+    var STAGE_TYPE_LABELS = { 'standard_rng': 'Standard RNG Stage', 'run_time': 'Run Time', 'hit_factor': 'Hit Factor' };
     const evType = ev.eventType || 'run_n_gun';
     const allowedTypes = getEventTypeConfig(evType).stageTypes;
     el.innerHTML = ev.stages.map(s => {
@@ -564,7 +589,7 @@ function renderEditStagesList() {
                     ${typeOptions}
                 </select>
                 <input type="number" class="edit-targets" value="${s.targets}" placeholder="# targets" min="0" style="width:100px${(s.type || 'standard_rng') === 'run_time' ? ';display:none' : ''}">
-                <input type="number" class="edit-par" value="${s.par}" placeholder="PAR (s)" min="0" step="0.01" style="width:100px${(s.type || 'standard_rng') === 'run_time' ? ';display:none' : ''}">
+                <input type="number" class="edit-par" value="${s.par}" placeholder="PAR (s)" min="0" step="0.01" style="width:100px${(s.type || 'standard_rng') === 'run_time' || s.type === 'hit_factor' ? ';display:none' : ''}">
                 <div class="edit-actions">
                     <button class="btn-save-edit" data-name="${s.name}">Save</button>
                     <button class="btn-cancel-edit">Cancel</button>
@@ -608,13 +633,17 @@ function renderEditStagesList() {
         sel.addEventListener('change', () => {
             const row = sel.closest('.competitor-item');
             const isRT = sel.value === 'run_time';
-            row.querySelector('.edit-targets').style.display = isRT ? 'none' : '';
-            row.querySelector('.edit-par').style.display     = isRT ? 'none' : '';
+            const isHF = sel.value === 'hit_factor';
+            row.querySelector('.edit-targets').style.display = (isRT) ? 'none' : '';
+            row.querySelector('.edit-par').style.display     = (isRT || isHF) ? 'none' : '';
             if (isRT) {
                 row.querySelector('.edit-targets').value = '';
                 row.querySelector('.edit-par').value = '';
                 var nameInput = row.querySelector('.edit-name');
                 if (!nameInput.value.trim()) nameInput.value = 'Run Time';
+            }
+            if (isHF) {
+                row.querySelector('.edit-par').value = '';
             }
         });
     });
@@ -644,7 +673,7 @@ function renderEditStagesList() {
                 name: newName,
                 type:    newType,
                 targets: newType === 'run_time' ? '' : row.querySelector('.edit-targets').value.trim(),
-                par:     newType === 'run_time' ? '' : row.querySelector('.edit-par').value.trim()
+                par:     (newType === 'run_time' || newType === 'hit_factor') ? '' : row.querySelector('.edit-par').value.trim()
             };
             updateEvent(editingEventId, { stages: evNow.stages });
             renderEditStagesList();

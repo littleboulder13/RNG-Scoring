@@ -527,12 +527,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     $('edit-stage-type').addEventListener('change', () => {
         const isRunTime = $('edit-stage-type').value === 'run_time';
+        const isHF = $('edit-stage-type').value === 'hit_factor';
         $('edit-stage-targets').style.display = isRunTime ? 'none' : '';
-        $('edit-stage-par').style.display     = isRunTime ? 'none' : '';
+        $('edit-stage-par').style.display     = (isRunTime || isHF) ? 'none' : '';
         if (isRunTime) {
             $('edit-stage-targets').value = '';
             $('edit-stage-par').value = '';
             if (!$('edit-stage-name').value.trim()) $('edit-stage-name').value = 'Run Time';
+        }
+        if (isHF) {
+            $('edit-stage-par').value = '';
         }
     });
     $('edit-stage-name').addEventListener('keypress', e => {
@@ -708,6 +712,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 ['Run Time (s)', score.time],
                 ['Notes', score.notes || '—']
             ];
+        } else if (score.stageType === 'hit_factor') {
+            rows = [
+                ['Stage', score.stage],
+                ['Shooter', score.playerName],
+                ['Division', score.division || '—'],
+                ['Time (s)', score.time],
+                ['Charlies', score.charlies || 0],
+                ['Deltas', score.deltas || 0],
+                ['Mikes', score.mikes || 0],
+                ['Procedurals', score.procedurals || 0],
+                ['FTE', score.fte || 0],
+                ['Total Points', score.totalPoints],
+                ['Hit Factor', score.hitFactor],
+                ['Notes', score.notes || '—']
+            ];
         } else {
             rows = [
                 ['Stage', score.stage],
@@ -833,6 +852,68 @@ document.addEventListener('DOMContentLoaded', () => {
                 targetsNotNeutralized: 0,
                 dnf:                   false,
                 notes:                 $('notes').value
+            };
+
+            showConfirmScoreModal(score);
+            return;
+        }
+
+        // --- Hit Factor stage validation ---
+        if (stageType === 'hit_factor') {
+            const hfTime = parseFloat($('hf-time').value);
+            if (isNaN(hfTime) || hfTime <= 0) {
+                const err = $('form-error');
+                err.textContent = 'Enter a valid time.';
+                err.style.display = 'block';
+                return;
+            }
+
+            const charlies    = parseInt($('hf-charlies').value) || 0;
+            const deltas      = parseInt($('hf-deltas').value) || 0;
+            const mikes       = parseInt($('hf-mikes').value) || 0;
+            const procedurals = parseInt($('hf-procedurals').value) || 0;
+            const fte         = parseInt($('hf-fte').value) || 0;
+
+            // USPSA Minor: A=5, C=3, D=1, M=0 (-10 pen), Procedural=-10, FTE=-10
+            // Total scoring hits = targets × 2, Alphas = total - C - D - M
+            const totalHits = (!isNaN(stageTargets) && stageTargets > 0) ? stageTargets * 2 : 0;
+            const alphas = Math.max(0, totalHits - charlies - deltas - mikes);
+            const rawPoints = (alphas * 5) + (charlies * 3) + (deltas * 1);
+            const penalties  = (mikes * 10) + (procedurals * 10) + (fte * 10);
+            const totalPoints = rawPoints - penalties;
+            const hitFactor = totalPoints / hfTime;
+
+            $('form-error').style.display = 'none';
+
+            const playerName = $('player-name').value;
+            await dbReady;
+            const existing = await getEventScores();
+            const isDuplicate = existing.some(s => s.playerName === playerName && s.stage === stageName);
+            if (isDuplicate) {
+                const confirmed = confirm(
+                    `A score for "${playerName}" on "${stageName}" has already been recorded.\n\nAre you sure you want to add another entry?`
+                );
+                if (!confirmed) return;
+            }
+
+            const score = {
+                eventId:      getActiveEventId(),
+                stage:        stageName,
+                stageType:    'hit_factor',
+                playerName,
+                division:     getPlayerDivision($('player-name').value),
+                time:         hfTime,
+                charlies,
+                deltas,
+                mikes,
+                procedurals,
+                fte,
+                totalPoints,
+                hitFactor:    Math.round(hitFactor * 10000) / 10000,
+                waitTime:     0,
+                targetsNotNeutralized: 0,
+                dnf:          false,
+                notes:        $('notes').value
             };
 
             showConfirmScoreModal(score);
