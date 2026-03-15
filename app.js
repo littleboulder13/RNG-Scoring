@@ -543,6 +543,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Enter') { e.preventDefault(); $('edit-add-stage-btn').click(); }
     });
 
+    // --- Hit Factor stepper +/- buttons ---
+    document.querySelectorAll('.hf-step-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const input = $(btn.dataset.target);
+            if (!input) return;
+            let val = parseInt(input.value) || 0;
+            if (btn.classList.contains('hf-plus')) {
+                val++;
+            } else {
+                val = Math.max(0, val - 1);
+            }
+            input.value = val;
+        });
+    });
+
     // --- Score Entry tab ---
     $('stage').addEventListener('change', () => {
         showStageInfo();

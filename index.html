@@ -26,7 +26,7 @@
                 <img src="logo.png" alt="Stilly Run 'N Gun" class="event-logo">
                 <h1>Stilly Run 'N Gun</h1>
                 <p>Select an event to continue</p>
-                <span id="app-version" style="font-size:0.75rem;color:#ff0;background:#333;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px;">v129</span>
+                <span id="app-version" style="font-size:0.75rem;color:#ff0;background:#333;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px;">v130</span>
                 <div style="margin-top:10px;display:flex;gap:8px;justify-content:center;">
                     <button id="pull-events-btn" onclick="pullEvents()" style="font-size:0.85rem;padding:6px 14px;border:none;border-radius:6px;background:#1565c0;color:#fff;cursor:pointer;">⬇ Pull from Cloud</button>
                 </div>
@@ -135,7 +135,7 @@
                 <div class="header-brand">
                     <img src="logo.png" alt="" class="header-logo">
                     <h1>Stilly RNG</h1>
-                    <span id="app-version-header" class="app-version-badge">v129</span>
+                    <span id="app-version-header" class="app-version-badge">v130</span>
                 </div>
                 <div id="active-event-bar" class="active-event-bar" style="display:none">
                     📋 <span id="active-event-name"></span>
@@ -231,23 +231,43 @@
                         <div id="hf-fields" style="display:none">
                             <div class="form-group">
                                 <label for="hf-charlies">Charlies (C) <span class="time-format-hint">3 pts</span></label>
-                                <input type="number" id="hf-charlies" min="0" placeholder="0">
+                                <div class="hf-stepper">
+                                    <button type="button" class="hf-step-btn hf-minus" data-target="hf-charlies">−</button>
+                                    <input type="number" id="hf-charlies" min="0" placeholder="0" class="hf-stepper-input">
+                                    <button type="button" class="hf-step-btn hf-plus" data-target="hf-charlies">+</button>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label for="hf-deltas">Deltas (D) <span class="time-format-hint">1 pt</span></label>
-                                <input type="number" id="hf-deltas" min="0" placeholder="0">
+                                <div class="hf-stepper">
+                                    <button type="button" class="hf-step-btn hf-minus" data-target="hf-deltas">−</button>
+                                    <input type="number" id="hf-deltas" min="0" placeholder="0" class="hf-stepper-input">
+                                    <button type="button" class="hf-step-btn hf-plus" data-target="hf-deltas">+</button>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label for="hf-mikes">Mikes (M) <span class="time-format-hint">−10 penalty</span></label>
-                                <input type="number" id="hf-mikes" min="0" placeholder="0">
+                                <div class="hf-stepper">
+                                    <button type="button" class="hf-step-btn hf-minus" data-target="hf-mikes">−</button>
+                                    <input type="number" id="hf-mikes" min="0" placeholder="0" class="hf-stepper-input">
+                                    <button type="button" class="hf-step-btn hf-plus" data-target="hf-mikes">+</button>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label for="hf-procedurals">Procedurals <span class="time-format-hint">−10 penalty</span></label>
-                                <input type="number" id="hf-procedurals" min="0" placeholder="0">
+                                <div class="hf-stepper">
+                                    <button type="button" class="hf-step-btn hf-minus" data-target="hf-procedurals">−</button>
+                                    <input type="number" id="hf-procedurals" min="0" placeholder="0" class="hf-stepper-input">
+                                    <button type="button" class="hf-step-btn hf-plus" data-target="hf-procedurals">+</button>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label for="hf-fte">FTE <span class="time-format-hint">−10 penalty</span></label>
-                                <input type="number" id="hf-fte" min="0" placeholder="0">
+                                <div class="hf-stepper">
+                                    <button type="button" class="hf-step-btn hf-minus" data-target="hf-fte">−</button>
+                                    <input type="number" id="hf-fte" min="0" placeholder="0" class="hf-stepper-input">
+                                    <button type="button" class="hf-step-btn hf-plus" data-target="hf-fte">+</button>
+                                </div>
                             </div>
                         </div>
                         <div class="form-group">
