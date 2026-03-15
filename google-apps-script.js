@@ -1,6 +1,6 @@
 /**
  * =============================================================
- * Stilly Run 'N Gun — Google Apps Script (v125)
+ * Stilly Run 'N Gun — Google Apps Script (v126)
  *
  * Each event gets its own Google Spreadsheet in a Drive folder.
  * The master spreadsheet stores event metadata (Events tab) and
@@ -347,7 +347,8 @@ function _syncScores(ss, data) {
       if (emEntry.scores.length > 0) {
         var latest = emEntry.scores[emEntry.scores.length - 1];
         var latestTime = isRunTime ? latest.runTime : latest.time;
-        allScores[stage][emKey] = { time: latestTime, division: emEntry.division };
+        var latestTnt = isRunTime ? 0 : (latest.tnt || 0);
+        allScores[stage][emKey] = { time: latestTime, division: emEntry.division, tnt: latestTnt };
       }
     }
 
@@ -422,21 +423,24 @@ function _syncScores(ss, data) {
   }
 
   // Build results tabs per division
-  _buildResultsTabs(eventSS, stageNames, allScores, competitors, scoringMethod);
+  _buildResultsTabs(eventSS, stageNames, allScores, competitors, scoringMethod, stages);
 
   return _jsonResponse({ success: true, count: totalSynced });
 }
 
 /* =============================================================
-   Build Results tabs — one per division with percentile scoring.
-   Percentile = (fastest_time_in_division / shooter_time) × 100
-   DNF = 0%.  Overall = sum of stage percentiles.
+   Build Results tabs — one per division.
+   percentile_dnf0: (fastest_time / shooter_time) × 100, DNF = 0%
+   hit_factor:      HF = (targets − TNT) / time,
+                    stage% = (shooter HF / best HF) × 100
+   Overall = sum of stage percentiles.
    ============================================================= */
 var SCORING_METHODS = {
-  'percentile_dnf0': 'Percentile Scoring, DNF=0'
+  'percentile_dnf0': 'Percentile Scoring, DNF=0',
+  'hit_factor': 'Percentile Scoring (Hit Factor)'
 };
 
-function _buildResultsTabs(eventSS, stageNames, allScores, competitors, scoringMethod) {
+function _buildResultsTabs(eventSS, stageNames, allScores, competitors, scoringMethod, stages) {
   var methodLabel = SCORING_METHODS[scoringMethod] || SCORING_METHODS['percentile_dnf0'];
   // Build shooter → division map
   var shooterDiv = {};
@@ -466,39 +470,106 @@ function _buildResultsTabs(eventSS, stageNames, allScores, competitors, scoringM
     var shooters = divisionShooters[div];
     var tabName = ('Results \u2014 ' + div).substring(0, 100);
 
-    // Fastest valid time per stage within this division
-    var fastestPerStage = {};
-    for (var s1 = 0; s1 < stageNames.length; s1++) {
-      var stgName = stageNames[s1];
-      var fastest = Infinity;
-      for (var p1 = 0; p1 < shooters.length; p1++) {
-        var sc = allScores[stgName] && allScores[stgName][shooters[p1]];
-        if (sc && sc.time !== 'DNF' && typeof sc.time === 'number' && sc.time > 0 && sc.time < fastest) {
-          fastest = sc.time;
-        }
+    // Build stage info lookup (targets, type) from stages array
+    var stageInfo = {};
+    if (stages) {
+      for (var sti = 0; sti < stages.length; sti++) {
+        var stObj2 = stages[sti];
+        var stNm = stObj2.name || stObj2;
+        stageInfo[stNm] = {
+          type: stObj2.type || 'standard_rng',
+          targets: parseInt(stObj2.targets, 10) || 0
+        };
       }
-      fastestPerStage[stgName] = fastest === Infinity ? 0 : fastest;
     }
 
-    // Calculate percentile per stage per shooter
     var results = [];
-    for (var p2 = 0; p2 < shooters.length; p2++) {
-      var player = shooters[p2];
-      var stageResults = [];
-      var totalPct = 0;
-      for (var s2 = 0; s2 < stageNames.length; s2++) {
-        var pct = 0;
-        var entry = allScores[stageNames[s2]] && allScores[stageNames[s2]][player];
-        if (entry) {
-          var f = fastestPerStage[stageNames[s2]];
-          if (entry.time !== 'DNF' && typeof entry.time === 'number' && entry.time > 0 && f > 0) {
-            pct = (f / entry.time) * 100;
+
+    if (scoringMethod === 'hit_factor') {
+      // Hit Factor: HF = (targets − TNT) / time
+      // Stage % = (shooter HF / best HF in division) × 100
+      // For run-time or targetless stages, falls back to 1/time
+      var bestHfPerStage = {};
+      for (var s1 = 0; s1 < stageNames.length; s1++) {
+        var stgName = stageNames[s1];
+        var inf = stageInfo[stgName] || {};
+        var isRT = inf.type === 'run_time';
+        var bestHf = 0;
+        for (var p1 = 0; p1 < shooters.length; p1++) {
+          var sc = allScores[stgName] && allScores[stgName][shooters[p1]];
+          if (!sc || sc.time === 'DNF' || typeof sc.time !== 'number' || sc.time <= 0) continue;
+          var hf;
+          if (isRT || inf.targets <= 0) {
+            hf = 1 / sc.time;
+          } else {
+            var pts = inf.targets - (sc.tnt || 0);
+            hf = pts > 0 ? pts / sc.time : 0;
+          }
+          if (hf > bestHf) bestHf = hf;
+        }
+        bestHfPerStage[stgName] = bestHf;
+      }
+
+      for (var p2 = 0; p2 < shooters.length; p2++) {
+        var player = shooters[p2];
+        var stageResults = [];
+        var totalPct = 0;
+        for (var s2 = 0; s2 < stageNames.length; s2++) {
+          var pct = 0;
+          var stgN = stageNames[s2];
+          var inf2 = stageInfo[stgN] || {};
+          var isRT2 = inf2.type === 'run_time';
+          var entry = allScores[stgN] && allScores[stgN][player];
+          if (entry && entry.time !== 'DNF' && typeof entry.time === 'number' && entry.time > 0) {
+            var shooterHf;
+            if (isRT2 || inf2.targets <= 0) {
+              shooterHf = 1 / entry.time;
+            } else {
+              var shooterPts = inf2.targets - (entry.tnt || 0);
+              shooterHf = shooterPts > 0 ? shooterPts / entry.time : 0;
+            }
+            var best = bestHfPerStage[stgN];
+            if (best > 0) pct = (shooterHf / best) * 100;
+          }
+          stageResults.push(pct);
+          totalPct += pct;
+        }
+        results.push({ name: player, stageResults: stageResults, stageRanks: [], total: totalPct });
+      }
+
+    } else {
+      // Default: percentile_dnf0 — (fastest_time / shooter_time) × 100
+      var fastestPerStage = {};
+      for (var s1b = 0; s1b < stageNames.length; s1b++) {
+        var stgName2 = stageNames[s1b];
+        var fastest = Infinity;
+        for (var p1b = 0; p1b < shooters.length; p1b++) {
+          var sc2 = allScores[stgName2] && allScores[stgName2][shooters[p1b]];
+          if (sc2 && sc2.time !== 'DNF' && typeof sc2.time === 'number' && sc2.time > 0 && sc2.time < fastest) {
+            fastest = sc2.time;
           }
         }
-        stageResults.push(pct);
-        totalPct += pct;
+        fastestPerStage[stgName2] = fastest === Infinity ? 0 : fastest;
       }
-      results.push({ name: player, stageResults: stageResults, stageRanks: [], total: totalPct });
+
+      for (var p2b = 0; p2b < shooters.length; p2b++) {
+        var player2 = shooters[p2b];
+        var stageResults2 = [];
+        var totalPct2 = 0;
+        for (var s2b = 0; s2b < stageNames.length; s2b++) {
+          var pct2 = 0;
+          var entry2 = allScores[stageNames[s2b]] && allScores[stageNames[s2b]][player2];
+          if (entry2) {
+            var f = fastestPerStage[stageNames[s2b]];
+            if (entry2.time !== 'DNF' && typeof entry2.time === 'number' && entry2.time > 0 && f > 0) {
+              pct2 = (f / entry2.time) * 100;
+            }
+          }
+          stageResults2.push(pct2);
+          totalPct2 += pct2;
+        }
+        results.push({ name: player2, stageResults: stageResults2, stageRanks: [], total: totalPct2 });
+      }
     }
 
     // Per-stage ranks (within this division)
@@ -609,18 +680,6 @@ function _pushEvent(ss, ev) {
     smCol = sheet.getLastColumn();
     sheet.getRange(1, smCol + 1).setValue('ScoringMethod');
     sheet.getRange(1, smCol + 1).setFontWeight('bold').setBackground('#1565c0').setFontColor('#ffffff');
-    hdrs = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  }
-
-  // Ensure EventType column exists
-  var etCol = -1;
-  for (var c3 = 0; c3 < hdrs.length; c3++) {
-    if (String(hdrs[c3]).toLowerCase().replace(/\s+/g, '') === 'eventtype') { etCol = c3; break; }
-  }
-  if (etCol === -1) {
-    etCol = sheet.getLastColumn();
-    sheet.getRange(1, etCol + 1).setValue('EventType');
-    sheet.getRange(1, etCol + 1).setFontWeight('bold').setBackground('#1565c0').setFontColor('#ffffff');
   }
 
   // Find existing row
@@ -653,8 +712,8 @@ function _pushEvent(ss, ev) {
     }
   }
 
-  // Build full row up to the last known column
-  var totalEvtCols = Math.max(ssIdCol, smCol, etCol) + 1;
+  // Build full row up to the last known column (smCol is furthest right)
+  var totalEvtCols = Math.max(ssIdCol, smCol) + 1;
   var row = new Array(totalEvtCols);
   row[0] = ev.id;
   row[1] = ev.name || '';
@@ -664,7 +723,6 @@ function _pushEvent(ss, ev) {
   row[5] = ev.password || '';
   row[ssIdCol] = existingSsId;
   row[smCol] = ev.scoringMethod || 'percentile_dnf0';
-  row[etCol] = ev.eventType || 'run_n_gun';
   // Fill any undefined slots
   for (var fi = 0; fi < row.length; fi++) { if (row[fi] === undefined) row[fi] = ''; }
 
@@ -714,7 +772,6 @@ function _pullEvents() {
     var pwCol     = colIdx['password'] !== undefined ? colIdx['password'] : 5;
     var ssIdCol   = colIdx['spreadsheetid'] !== undefined ? colIdx['spreadsheetid'] : -1;
     var smCol     = colIdx['scoringmethod'] !== undefined ? colIdx['scoringmethod'] : -1;
-    var etCol     = colIdx['eventtype'] !== undefined ? colIdx['eventtype'] : -1;
 
     return {
       id:            row[idCol],
@@ -723,8 +780,7 @@ function _pullEvents() {
       competitors:   safeParse(row[compCol], []),
       password:      row[pwCol] || '',
       spreadsheetId: ssIdCol >= 0 ? (row[ssIdCol] || '') : '',
-      scoringMethod: smCol >= 0 ? (row[smCol] || 'percentile_dnf0') : 'percentile_dnf0',
-      eventType:     etCol >= 0 ? (row[etCol] || 'run_n_gun') : 'run_n_gun'
+      scoringMethod: smCol >= 0 ? (row[smCol] || 'percentile_dnf0') : 'percentile_dnf0'
     };
   });
 
@@ -764,7 +820,7 @@ function _archiveEvent(ss, eventId) {
   var archiveSheet = ss.getSheetByName('ArchivedEvents');
   if (!archiveSheet) {
     archiveSheet = ss.insertSheet('ArchivedEvents');
-    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password', 'SpreadsheetId', 'ScoringMethod', 'EventType', 'ArchivedAt'];
+    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password', 'SpreadsheetId', 'ScoringMethod', 'ArchivedAt'];
     archiveSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     archiveSheet.getRange(1, 1, 1, headers.length)
       .setFontWeight('bold')
@@ -779,12 +835,6 @@ function _archiveEvent(ss, eventId) {
     if (String(hdrs[c2]).toLowerCase().replace(/\s+/g, '') === 'scoringmethod') { smCol = c2; break; }
   }
 
-  // Find EventType column
-  var etCol = -1;
-  for (var c3 = 0; c3 < hdrs.length; c3++) {
-    if (String(hdrs[c3]).toLowerCase().replace(/\s+/g, '') === 'eventtype') { etCol = c3; break; }
-  }
-
   var archiveRow = [
     rowData[0],                          // EventID
     rowData[1],                          // Name
@@ -794,7 +844,6 @@ function _archiveEvent(ss, eventId) {
     rowData[5],                          // Password
     ssIdCol >= 0 ? (rowData[ssIdCol] || '') : '',  // SpreadsheetId
     smCol >= 0 ? (rowData[smCol] || 'percentile_dnf0') : 'percentile_dnf0',  // ScoringMethod
-    etCol >= 0 ? (rowData[etCol] || 'run_n_gun') : 'run_n_gun',  // EventType
     new Date().toISOString()             // ArchivedAt
   ];
   archiveSheet.getRange(archiveSheet.getLastRow() + 1, 1, 1, archiveRow.length).setValues([archiveRow]);
@@ -836,7 +885,7 @@ function _restoreEvent(ss, eventId) {
   var sheet = ss.getSheetByName('Events') || ss.getSheetByName('_Events');
   if (!sheet) {
     sheet = ss.insertSheet('Events');
-    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password', 'SpreadsheetId', 'ScoringMethod', 'EventType'];
+    var headers = ['EventID', 'Name', 'Stages', 'Competitors', 'Updated', 'Password', 'SpreadsheetId', 'ScoringMethod'];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.getRange(1, 1, 1, headers.length)
       .setFontWeight('bold')
@@ -851,12 +900,6 @@ function _restoreEvent(ss, eventId) {
     if (String(archHdrs[c2]).toLowerCase().replace(/\s+/g, '') === 'scoringmethod') { archSmCol = c2; break; }
   }
 
-  // Find EventType column in archive
-  var archEtCol = -1;
-  for (var c3 = 0; c3 < archHdrs.length; c3++) {
-    if (String(archHdrs[c3]).toLowerCase().replace(/\s+/g, '') === 'eventtype') { archEtCol = c3; break; }
-  }
-
   var restoreRow = [
     rowData[0],                                           // EventID
     rowData[1],                                           // Name
@@ -865,8 +908,7 @@ function _restoreEvent(ss, eventId) {
     new Date().toISOString(),                             // Updated
     rowData[5],                                           // Password
     archSsIdCol >= 0 ? (rowData[archSsIdCol] || '') : '', // SpreadsheetId
-    archSmCol >= 0 ? (rowData[archSmCol] || 'percentile_dnf0') : 'percentile_dnf0',  // ScoringMethod
-    archEtCol >= 0 ? (rowData[archEtCol] || 'run_n_gun') : 'run_n_gun'  // EventType
+    archSmCol >= 0 ? (rowData[archSmCol] || 'percentile_dnf0') : 'percentile_dnf0'  // ScoringMethod
   ];
   sheet.getRange(sheet.getLastRow() + 1, 1, 1, restoreRow.length).setValues([restoreRow]);
   archiveSheet.deleteRow(rowIndex);
@@ -962,11 +1004,6 @@ function _pullArchivedEvents() {
 
   var numCols = sheet.getLastColumn();
   var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, numCols).getValues();
-  var headers = sheet.getRange(1, 1, 1, numCols).getValues()[0];
-  var colIdx = {};
-  for (var c = 0; c < headers.length; c++) {
-    colIdx[String(headers[c]).toLowerCase().replace(/\s+/g, '')] = c;
-  }
 
   function safeParse(val, fallback) {
     if (!val || typeof val !== 'string') return fallback;
@@ -976,17 +1013,11 @@ function _pullArchivedEvents() {
 
   return _jsonResponse({
     events: data.map(function(row) {
-      var smCol = colIdx['scoringmethod'] !== undefined ? colIdx['scoringmethod'] : -1;
-      var etCol = colIdx['eventtype'] !== undefined ? colIdx['eventtype'] : -1;
-      var pwCol = colIdx['password'] !== undefined ? colIdx['password'] : 5;
       return {
-        id:            row[0],
-        name:          row[1],
-        stages:        safeParse(row[2], []),
-        competitors:   safeParse(row[3], []),
-        password:      row[pwCol] || '',
-        scoringMethod: smCol >= 0 ? (row[smCol] || 'percentile_dnf0') : 'percentile_dnf0',
-        eventType:     etCol >= 0 ? (row[etCol] || 'run_n_gun') : 'run_n_gun'
+        id:          row[0],
+        name:        row[1],
+        stages:      safeParse(row[2], []),
+        competitors: safeParse(row[3], [])
       };
     })
   });
