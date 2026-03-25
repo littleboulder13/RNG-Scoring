@@ -1,6 +1,6 @@
 /**
  * =============================================================
- * Stilly Run 'N Gun — Google Apps Script (v137)
+ * Stilly Run 'N Gun — Google Apps Script (v138)
  *
  * Each event gets its own Google Spreadsheet in a Drive folder.
  * The master spreadsheet stores event metadata (Events tab) and
@@ -637,6 +637,7 @@ function _buildResultsTabs(eventSS, stageNames, allScores, competitors, scoringM
         var infS = stageInfo[stgNs] || {};
         var isTimePlusStg = (infS.type === 'time_plus');
         var isHitFactorStg = (infS.type === 'hit_factor');
+        var isRunTimeStg = (infS.type === 'run_time');
 
         // Collect valid times for completers in this division
         var completers = [];
@@ -652,6 +653,34 @@ function _buildResultsTabs(eventSS, stageNames, allScores, competitors, scoringM
               completers.push({ idx: ps, val: scS.time });
             }
           }
+        }
+
+        // Run Time stages: fastest 75% get percentile scoring, slowest 25% get 0
+        if (isRunTimeStg && completers.length > 0) {
+          // Sort completers by time ascending (fastest first)
+          completers.sort(function(a, b) { return a.val - b.val; });
+          var cutoffIdx = Math.ceil(completers.length * 0.75);
+          var rtFastest = completers[0].val;
+          // Build set of slowest-25% shooter indices
+          var slowSet = {};
+          for (var rt25 = cutoffIdx; rt25 < completers.length; rt25++) {
+            slowSet[completers[rt25].idx] = true;
+          }
+
+          for (var ps2 = 0; ps2 < shooters.length; ps2++) {
+            var pts2 = 0; // no score if not a completer (run_time has no DNF)
+            var scS2 = allScores[stgNs] && allScores[stgNs][shooters[ps2]];
+            if (scS2 && typeof scS2.time === 'number' && scS2.time > 0) {
+              if (slowSet[ps2]) {
+                pts2 = 0;
+              } else if (rtFastest > 0) {
+                pts2 = (rtFastest / scS2.time) * 100;
+              }
+            }
+            results[ps2].stageResults.push(pts2);
+            results[ps2].total += pts2;
+          }
+          continue; // skip to next stage
         }
 
         // Find best and worst values among completers
