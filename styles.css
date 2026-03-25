@@ -1414,9 +1414,15 @@ body:not(.admin-mode) .admin-only {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.35rem 0;
+    padding: 0.35rem 0.5rem;
     border-top: 1px solid #FFE0B2;
     font-size: 0.85rem;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.active-runner-item:hover {
+    background: #FFF3E0;
 }
 
 .active-runner-item:first-child {
@@ -1435,7 +1441,6 @@ body:not(.admin-mode) .admin-only {
     font-size: 0.85rem;
 }
 
-.runner-select-btn,
 .runner-clear-btn {
     background: none;
     border: none;
@@ -1444,14 +1449,6 @@ body:not(.admin-mode) .admin-only {
     border-radius: 4px;
     font-size: 0.9rem;
     line-height: 1;
-}
-
-.runner-select-btn {
-    color: #1565C0;
-}
-
-.runner-select-btn:hover {
-    background: #E3F2FD;
 }
 
 .runner-clear-btn {

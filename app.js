@@ -242,15 +242,15 @@ function updateActiveRunners() {
         return `<div class="active-runner-item" data-player="${r.playerName}">
             <span class="runner-name">${r.playerName}</span>
             <span class="runner-start">${r.startHms || ''}</span>
-            <button type="button" class="runner-select-btn" title="Select this shooter">↩</button>
             <button type="button" class="runner-clear-btn" title="Remove saved start">✕</button>
         </div>`;
     }).join('');
 
-    // Attach click handlers for select / clear buttons
-    list.querySelectorAll('.runner-select-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const name = btn.closest('.active-runner-item').dataset.player;
+    // Clicking anywhere on the row (except the clear button) selects the runner
+    list.querySelectorAll('.active-runner-item').forEach(row => {
+        row.addEventListener('click', (e) => {
+            if (e.target.closest('.runner-clear-btn')) return;
+            const name = row.dataset.player;
             $('player-name').value = name;
             showShooterDivision();
             checkAndFillPendingStart();
