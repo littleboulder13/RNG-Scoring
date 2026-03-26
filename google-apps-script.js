@@ -1,6 +1,6 @@
 /**
  * =============================================================
- * Stilly Run 'N Gun — Google Apps Script (v141)
+ * Stilly Run 'N Gun — Google Apps Script (v142)
  *
  * Each event gets its own Google Spreadsheet in a Drive folder.
  * The master spreadsheet stores event metadata (Events tab) and
@@ -483,6 +483,14 @@ function _syncScores(ss, data) {
 
     if (rows.length) {
       sheet.getRange(2, 1, rows.length, totalCols).setValues(rows);
+
+      // Highlight rows yellow where the shooter has multiple scores
+      for (var hi = 0; hi < compList.length; hi++) {
+        var hEntry = existingMap[compList[hi].name];
+        if (hEntry && hEntry.scores.length > 1) {
+          sheet.getRange(hi + 2, 1, 1, totalCols).setBackground('#ffff00');
+        }
+      }
     }
 
     for (var col = 1; col <= totalCols; col++) {
