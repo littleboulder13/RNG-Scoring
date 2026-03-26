@@ -1,6 +1,6 @@
 /**
  * =============================================================
- * Stilly Run 'N Gun — Google Apps Script (v140)
+ * Stilly Run 'N Gun — Google Apps Script (v141)
  *
  * Each event gets its own Google Spreadsheet in a Drive folder.
  * The master spreadsheet stores event metadata (Events tab) and
@@ -210,13 +210,13 @@ function _syncScores(ss, data) {
   }
 
   var BASE_HEADERS = ['#', 'Shooter', 'Division'];
-  var STD_SCORE_HEADERS = ['Time (s)', 'Targets Not Neutralized', 'Wait Time (m:ss)', 'Wait Time (s)', 'Notes'];
+  var STD_SCORE_HEADERS = ['Time (s)', 'Targets Not Neutralized', 'Wait Time (m:ss)', 'Wait Time (s)', 'Notes', 'Saved At'];
   var STD_SCORE_COLS = STD_SCORE_HEADERS.length;
-  var RT_SCORE_HEADERS = ['Start Time (H:MM:SS)', 'Start Time (s)', 'Finish Time (H:MM:SS)', 'Finish Time (s)', 'Run Time (s)', 'Notes'];
+  var RT_SCORE_HEADERS = ['Start Time (H:MM:SS)', 'Start Time (s)', 'Finish Time (H:MM:SS)', 'Finish Time (s)', 'Run Time (s)', 'Notes', 'Saved At'];
   var RT_SCORE_COLS = RT_SCORE_HEADERS.length;
-  var HF_SCORE_HEADERS = ['Time (s)', 'Charlies', 'Deltas', 'Mikes', 'Procedurals', 'FTE', 'Total Points', 'Hit Factor', 'Notes'];
+  var HF_SCORE_HEADERS = ['Time (s)', 'Charlies', 'Deltas', 'Mikes', 'Procedurals', 'FTE', 'Total Points', 'Hit Factor', 'Notes', 'Saved At'];
   var HF_SCORE_COLS = HF_SCORE_HEADERS.length;
-  var TP_SCORE_HEADERS = ['Time (s)', 'Down 1/Charlie', 'Down 3/Delta', 'Misses', 'Procedurals', 'No Shoot', 'FTE', 'Penalty Time', 'Total Time', 'Notes'];
+  var TP_SCORE_HEADERS = ['Time (s)', 'Down 1/Charlie', 'Down 3/Delta', 'Misses', 'Procedurals', 'No Shoot', 'FTE', 'Penalty Time', 'Total Time', 'Notes', 'Saved At'];
   var TP_SCORE_COLS = TP_SCORE_HEADERS.length;
 
   // Build stage name → type lookup
@@ -300,7 +300,8 @@ function _syncScores(ss, data) {
               finishTimeFmt: existData[ex][off + 2] || '',
               finishTimeSec: existData[ex][off + 3] || 0,
               runTime: existData[ex][off + 4] || 0,
-              notes: existData[ex][off + 5] || ''
+              notes: existData[ex][off + 5] || '',
+              savedAt: existData[ex][off + 6] || ''
             });
           } else if (isHitFactor) {
             exScores.push({
@@ -312,7 +313,8 @@ function _syncScores(ss, data) {
               fte: existData[ex][off + 5] || 0,
               totalPoints: existData[ex][off + 6] || 0,
               hitFactor: existData[ex][off + 7] || 0,
-              notes: existData[ex][off + 8] || ''
+              notes: existData[ex][off + 8] || '',
+              savedAt: existData[ex][off + 9] || ''
             });
           } else if (isTimePlus) {
             exScores.push({
@@ -325,7 +327,8 @@ function _syncScores(ss, data) {
               fte: existData[ex][off + 6] || 0,
               penaltyTime: existData[ex][off + 7] || 0,
               totalTime: existData[ex][off + 8] || 0,
-              notes: existData[ex][off + 9] || ''
+              notes: existData[ex][off + 9] || '',
+              savedAt: existData[ex][off + 10] || ''
             });
           } else {
             exScores.push({
@@ -333,7 +336,8 @@ function _syncScores(ss, data) {
               tnt: existData[ex][off + 1] || 0,
               waitTime: existData[ex][off + 2] || '',
               waitTimeSec: existData[ex][off + 3] || 0,
-              notes: existData[ex][off + 4] || ''
+              notes: existData[ex][off + 4] || '',
+              savedAt: existData[ex][off + 5] || ''
             });
           }
         }
@@ -354,7 +358,8 @@ function _syncScores(ss, data) {
           finishTimeFmt: sc.finishTimeFormatted || fmtHms(sc.finishTime || 0),
           finishTimeSec: sc.finishTime || 0,
           runTime: sc.time || 0,
-          notes: sc.notes || ''
+          notes: sc.notes || '',
+          savedAt: sc.savedAt || ''
         };
       } else if (isHitFactor) {
         newScore = {
@@ -366,7 +371,8 @@ function _syncScores(ss, data) {
           fte: sc.fte || 0,
           totalPoints: sc.totalPoints || 0,
           hitFactor: sc.hitFactor || 0,
-          notes: sc.notes || ''
+          notes: sc.notes || '',
+          savedAt: sc.savedAt || ''
         };
       } else if (isTimePlus) {
         newScore = {
@@ -379,7 +385,8 @@ function _syncScores(ss, data) {
           fte: sc.fte || 0,
           penaltyTime: sc.penaltyTime || 0,
           totalTime: sc.totalTime || 0,
-          notes: sc.notes || ''
+          notes: sc.notes || '',
+          savedAt: sc.savedAt || ''
         };
       } else {
         newScore = {
@@ -387,7 +394,8 @@ function _syncScores(ss, data) {
           tnt: sc.targetsNotNeutralized || 0,
           waitTime: fmtWait(waitSec),
           waitTimeSec: waitSec,
-          notes: sc.notes || ''
+          notes: sc.notes || '',
+          savedAt: sc.savedAt || ''
         };
       }
       if (!existingMap[pn]) {
@@ -450,13 +458,13 @@ function _syncScores(ss, data) {
         if (entry && sb < entry.scores.length) {
           var sc2 = entry.scores[sb];
           if (isRunTime) {
-            row.push(sc2.startTimeFmt, sc2.startTimeSec, sc2.finishTimeFmt, sc2.finishTimeSec, sc2.runTime, sc2.notes);
+            row.push(sc2.startTimeFmt, sc2.startTimeSec, sc2.finishTimeFmt, sc2.finishTimeSec, sc2.runTime, sc2.notes, sc2.savedAt);
           } else if (isHitFactor) {
-            row.push(sc2.time, sc2.charlies, sc2.deltas, sc2.mikes, sc2.procedurals, sc2.fte, sc2.totalPoints, sc2.hitFactor, sc2.notes);
+            row.push(sc2.time, sc2.charlies, sc2.deltas, sc2.mikes, sc2.procedurals, sc2.fte, sc2.totalPoints, sc2.hitFactor, sc2.notes, sc2.savedAt);
           } else if (isTimePlus) {
-            row.push(sc2.time, sc2.down1, sc2.down3, sc2.misses, sc2.procedurals, sc2.noShoot, sc2.fte, sc2.penaltyTime, sc2.totalTime, sc2.notes);
+            row.push(sc2.time, sc2.down1, sc2.down3, sc2.misses, sc2.procedurals, sc2.noShoot, sc2.fte, sc2.penaltyTime, sc2.totalTime, sc2.notes, sc2.savedAt);
           } else {
-            row.push(sc2.time, sc2.tnt, sc2.waitTime, sc2.waitTimeSec, sc2.notes);
+            row.push(sc2.time, sc2.tnt, sc2.waitTime, sc2.waitTimeSec, sc2.notes, sc2.savedAt);
           }
         } else {
           for (var pad = 0; pad < SCORE_COLS; pad++) row.push('');

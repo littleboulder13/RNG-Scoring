@@ -885,7 +885,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 waitTime:              0,
                 targetsNotNeutralized: 0,
                 dnf:                   false,
-                notes:                 $('notes').value
+                notes:                 $('notes').value,
+                savedAt:               new Date().toTimeString().slice(0, 8)
             };
 
             showConfirmScoreModal(score);
@@ -947,7 +948,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 waitTime:     0,
                 targetsNotNeutralized: 0,
                 dnf:          false,
-                notes:        $('notes').value
+                notes:        $('notes').value,
+                savedAt:      new Date().toTimeString().slice(0, 8)
             };
 
             showConfirmScoreModal(score);
@@ -1006,7 +1008,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 waitTime:     0,
                 targetsNotNeutralized: 0,
                 dnf:          false,
-                notes:        $('notes').value
+                notes:        $('notes').value,
+                savedAt:      new Date().toTimeString().slice(0, 8)
             };
 
             showConfirmScoreModal(score);
@@ -1086,7 +1089,8 @@ document.addEventListener('DOMContentLoaded', () => {
             waitTime:              parseMsToSeconds($('wait-time').value) || 0,
             targetsNotNeutralized: (getActiveEvent()?.scoringMethod === 'spread_dnf_neg25') ? 0 : tnt,
             dnf:                   $('dnf').checked,
-            notes:                 $('notes').value
+            notes:                 $('notes').value,
+            savedAt:               new Date().toTimeString().slice(0, 8)
         };
 
         showConfirmScoreModal(score);
